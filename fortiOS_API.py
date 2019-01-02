@@ -269,11 +269,9 @@ class FGT(object):
                 return False
 ###############################################################################
 def testmain():
-    #https://161.132.109.162:9443/api/v2/monitor/system/vdom-resource/select/
-    #161.132.109.162:9443
-    urlprefix = 'https://161.132.109.162:9443'
-    username = 'deyvis.supra' #fortisiem'
-    password = 'd3yv1s' #'5upporT@$1eM'
+    urlprefix = 'https://8.8.8.8:9443'
+    username = 'user'
+    password = 'pass'
     vdom = 'root'
 
     fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
