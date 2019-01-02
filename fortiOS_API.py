@@ -5,21 +5,50 @@
 # Description: Server to conect to FireWall using API
 # Code Base: https://github.com/sheltont/fortiapi/blob/master/fgt.py
 #########################################################################################
-import logging,sys
+import logging,sys,time
 from pprint import pprint
 import requests
+import sys, json, socket, argparse
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
-
+###############################################################################
+def send_json(msg, IP="0.0.0.0", PORT = 2233):
+    """
+        #Configuracion en /etc/logstash/conf.d/logstash-syslog.conf
+        input{
+            tcp{
+                port => [PORT_NUMBER]
+                codec => json
+            }
+        }
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect( (IP,PORT) )
+        #print "sending message: "+str(msg)
+        datajs = json.dumps(msg)
+        sock.sendall( datajs.encode() )
+    except:
+        print("Error inesperado: "+sys.exc_info()[0])
+        #sys.exit(1)
+        return
+    finally:
+        sock.close()
+        return
+###############################################################################
+def fileTXT_save(text, nameFile = "backupForti.txt"):
+    fnew  = open(nameFile,"wb")
+    fnew.write(text.encode('utf-8')) # str(aux=[line])+'\n'
+    fnew.close() 
+    return
+###############################################################################
 class AuthenticationError(Exception):
     def __init__(self, value):
         self.value = value
 
     def __str__(self):
         return repr(self.value)
-
-
+###############################################################################
 class BadResponse(Exception):
     def __init__(self, value, body=''):
         self.value = value
@@ -30,8 +59,7 @@ class BadResponse(Exception):
 
     def __str__(self):
         return repr(self.value)
-
-
+###############################################################################
 # API class to access FOS REST API
 class FGT(object):
     """
@@ -41,7 +69,7 @@ class FGT(object):
     Script will start a session by login into the FGT
     All subsequent calls will use the session's cookies and CSRF token
     """
-    def __init__(self, url_prefix, vdom, verbose=True):
+    def __init__(self, url_prefix, vdom, verbose=False):#H23
         self.url_prefix = url_prefix
         self.session = requests.session()  # use single session for all requests
         self.vdom = vdom
@@ -66,10 +94,10 @@ class FGT(object):
         res = self.session.post(url,
                                 data='username=' + name + '&secretkey=' + key,
                                 verify=False)
-
+        
         if res.status_code != 200 or res.text.find('error') != -1:
             # Found some error in the response, consider login failed
-            raise AuthenticationError('Authentication error')
+            raise AuthenticationError('Authentication error [' + str(url) + "]")
 
         # Update session's csrftoken
         self.update_csrf()
@@ -78,11 +106,11 @@ class FGT(object):
         url = self.url_prefix + '/logout'
         res = self.session.post(url)
 
-    def get(self, url_postfix, params=None, data=None, verbose=True):
+    def get(self, url_postfix, params=None, data=None, verbose=True, get_text=False):
         url = self.url_prefix + url_postfix
         res = self.session.get(url, params=self.append_vdom_params(params), data=data)
         self.update_csrf()  # update session's csrf
-        return self.check_response(res, verbose)
+        return self.check_response(res, verbose, get_text)
 
     def post(self, url_postfix, params=None, data=None, verbose=True):
         url = self.url_prefix + url_postfix
@@ -168,12 +196,14 @@ class FGT(object):
                 params['vdom'] = self.vdom
         return params
 
-    def check_response(self, response, verbose=True):
+    def check_response(self, response, verbose=True, get_text=False):
 
         self.logger.debug('{0} {1}'.format(response.request.method, response.request.url))
 
         # Check response status, content and compare with original request
         if response.status_code == 200:
+            if (get_text):#Set True if want to download file - H23
+                return response.text
             # Success code, now check json response
             try:
                 # Retrieve json data
@@ -181,7 +211,7 @@ class FGT(object):
             except:
                 error = 'Invalid JSON response'
                 self.logger.error(error)
-                self.logger.info(response.text)
+                self.logger.info(response.text) #H23
                 raise BadResponse(error, response.text)
             else:
                 # Check if json data is empty
@@ -237,20 +267,37 @@ class FGT(object):
             finally:
                 self.logger.error(response.text)
                 return False
-
-
+###############################################################################
 def testmain():
-    urlprefix = 'https://172.16.28.1:4433'
-    username = 'readonly'
-    password = 'Password01!'
+    #https://161.132.109.162:9443/api/v2/monitor/system/vdom-resource/select/
+    #161.132.109.162:9443
+    urlprefix = 'https://161.132.109.162:9443'
+    username = 'deyvis.supra' #fortisiem'
+    password = 'd3yv1s' #'5upporT@$1eM'
     vdom = 'root'
 
-    fgt = FGT(urlprefix)
+    fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
     fgt.login(username, password)
-    # Example of CMDB API requests
-    res = fgt.get('/api/v2/cmdb')
+    
+    #Download backup forti
+    res = fgt.get('/api/v2/monitor/system/config/backup?scope=global',get_text=True)
+    fileTXT_save(res, nameFile = "backupForti.conf")
+
+    #
+    res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://161.132.109.162:9443/api/v2/monitor/router/ipv4/select/
     pprint(res)
 
+    # Example of CMDB API requests
+    #res = fgt.get('/api/v2/cmdb/system/interface')
+    #pprint(res)
+    #res = fgt.get('/api/v2/cmdb/firewall/policy')
+    #headers = 'Content-Disposition': attachment
+    #res = fgt.get('/api/v2/cmdb/vpn.certificate/ca')
+    #res = fgt.get('/')
+    #res = fgt.get('/api/v2/monitor/system/config/backup?mkey=Fortinet_Factory&type=local&scope=global')
+    #res = fgt.get('/api/v2/monitor/system/config/download?mkey=Fortinet_Factory&type=local&scope=global')
+    #pprint(res)
+    """
     # Uncomment below to run other sample requests
     res = fgt.get('/api/v2/cmdb/firewall/address', params={"action":"schema", "vdom":vdom})
     pprint(res)
@@ -266,7 +313,7 @@ def testmain():
                                                             "subnet":"1.1.1.1 255.255.255.255"}},
                                               verbose=True)
     pprint(res)
-
+    """
     """
     fgt.post('/api/v2/cmdb/firewall.service/custom', params={"vdom":vdom},
                                                      data={"json":{"name":"server1_port",
@@ -305,23 +352,66 @@ def testmain():
     """
     # Always logout after testing is done
     fgt.logout()
+###############################################################################
+def receive_parameters_from_bash():
+    #global ip , port , user , passw , command , ip_logstash , port_logstash
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i","--ip",help="ip of host")
+    parser.add_argument("-pp","--port",help="Port of host")
+    parser.add_argument("-u","--user",help="Usuario SSH")
+    parser.add_argument("-p","--password",help="Password SSH")
+    parser.add_argument("-c","--command",help="URL of API res")
+    parser.add_argument("-ip_out","--ip_out",help="IP of logstash")
+    parser.add_argument("-pp_out","--pp_out",help="Port of logstash")
 
+    args = parser.parse_args()
+
+    if args.ip: ip = str(args.ip)
+    if args.port: port = int(args.port)
+    if args.user: user = str(args.user)
+    if args.password: passw = str(args.password)
+    if args.command: command = str(args.command)
+    if args.ip_out: ip_logstash = str(args.ip_out)
+    if args.pp_out: port_logstash = int(args.pp_out)
+
+    if( ip==None or port==None or user==None or passw==None):
+        print("\nERROR: Faltan parametros.")
+        print("ip\t= ["+str(ip)+"] \nport\t= ["+str(port)+"] \nuser\t= ["+str(user)+"] \n"+"passw\t= ["+str(passw)+"]")
+        sys.exit(0)
+    
+    if( ip_logstash==None or port_logstash==None):
+        print("\nERROR: Faltan parametros.")
+        print("ip_out\t= ["+str(ip_logstash)+"]\npp_out\t= ["+str(port_logstash)+"]")
+        sys.exit(0)
+
+    vdom = 'root'
+    urlprefix = 'https://' + str(ip) + ":" + str(port)
+    
+    fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
+    fgt.login(user, passw)
+    
+    #Download of backup
+    if(command=='/api/v2/monitor/system/config/backup?scope=global'):
+        res = fgt.get(command,get_text=True)
+        #fileTXT_save(res, nameFile = "backupForti.txt")
+        #Send backup file to logstash
+        send_json( {'url_api': command ,'backup_file':res, 'host': ip } , IP=ip_logstash, PORT=port_logstash)
+    else:
+        res = fgt.get(command) # /api/v2/monitor/router/ipv4/select/
+        #pprint(res)
+        #Send data to logstash
+        res.update({'url_api': command , "host": ip })
+        send_json( res , IP=ip_logstash, PORT=port_logstash)
+    fgt.logout()
 
 if __name__ == '__main__':
-    testmain()
-© 2018 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
-Press h to open a hovercard with more details.
-if __name__ == '__main__':
-    #app.run(port=8080) #host="190.116.76.4"
-    get_token(user="fortisiem",password="5upporT@$1eM")
+    #testmain()
+    receive_parameters_from_bash()
+"""
+DATOS A DESCARGAR DEL FIREWALL
+firewall/session/select/ GET List all active firewall sessions (optionally filtered).
+firewall/shaper/select/ GET List of statistics for configured firewall shapers.
+license/status/select/ GET Get current license and registration status.
+system/resource/usage/ GET Retreive current and historical usage data for a provided
+resource.
+"""
