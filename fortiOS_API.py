@@ -282,7 +282,7 @@ def testmain():
     fileTXT_save(res, nameFile = "backupForti.conf")
 
     #
-    res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://161.132.109.162:9443/api/v2/monitor/router/ipv4/select/
+    res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://8.8.8.8:9443/api/v2/monitor/router/ipv4/select/
     pprint(res)
 
     # Example of CMDB API requests
