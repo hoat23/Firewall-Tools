@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8 
 # Developer: Deiner Zapata Silva.
-# Date: 19/11/2018
+# Date: 31/12/2018
 # Description: Server to conect to FireWall using API
 # Code Base: https://github.com/sheltont/fortiapi/blob/master/fgt.py
 #########################################################################################
