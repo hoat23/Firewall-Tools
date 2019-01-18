@@ -39,7 +39,7 @@ def lauch_get_to_firewall(ip,port,username,password,command):
     #print("--> [%04s|%04d|%02.4f|%016s] | %s " %(status, num, enlapsed_time, client,urlprefix))#pprint(res)
     return res
 #########################################################################################
-def execute_get(ip,ip_logstash,port_logstash,username = "backup.supra",password = "5upporT@",command = '/api/v2/monitor/system/vdom-resource/select/',num_int=4):
+def execute_get(ip,ip_logstash,port_logstash,username = "user",password = "password",command = '/api/v2/monitor/system/vdom-resource/select/',num_int=4):
     num=0
     if (len(ip.split(":"))==2):
         aux = ip.split(":")
