@@ -1,7 +1,7 @@
 #coding: UTF-8 
 #########################################################################################
 # Developer: Deiner Zapata Silva.
-# Date: 19/11/2018
+# Date: 17/01/2019
 # Description: Downloading BD Information Security and uploading to elastic.
 # sys.setdefaultencoding('utf-8') #reload(sys)
 #########################################################################################
@@ -33,16 +33,25 @@ def req_get(URL_API,data="",timeout=None):
     #print(str(rpt.json))
     return rpt.text
 ###############################################################################################################
-def convert_data(data_txt):
+def convert_data(data_txt,list_field=None,aditional_data={}):
     num=0
+    data_txt = data_txt.replace("\"","")
+    data_txt = data_txt.replace("\r","")
     list_lines = data_txt.split('\n')
     for line in list_lines:
         if len(line):
-            if (line[1]=='#' or line[1]==' '):
+            if (line[0]=='#' or line[0]==' '):
                 num = 0
             else:
                 num=num+1
-                print(str(num) + ". " + line)
+                if(num==1 and list_field==None):
+                    list_field = line.split(',')
+                else:
+                    list_value = line.split(',')
+                    line_json = list2json(list_field,list_value)
+                    line_json.update(aditional_data)
+                    print_json(line_json)
+            print("{0:03d}. {1}".format(num,line))
 ###############################################################################################################
 def download_HahilTAAXI():
     HailATaxiiFeedList=[
@@ -84,33 +93,71 @@ def download_HahilTAAXI():
 def download_Zeus_IP():
     print("############################## Zeus   IP   ##############################")
     URL = "https://zeustracker.abuse.ch/blocklist.php?download=ipblocklist"
+    list_field = ["ip"]
     data_txt = req_get(URL)
-    data_parsed = convert_data(data_txt)
-    return
+    data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"zeustracker_ip"})
+    send_json(data_parsed,IP=ip_logstash,PORT=port_logstash)
+    return data_parsed
 ###############################################################################################################
 def download_Zeus_Domain():
     print("############################## Zeus Domain ##############################")
     URL = "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist"
+    list_field = ["domain"]
     data_txt = req_get(URL)
-    data_parsed = convert_data(data_txt)
-    return
+    data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"zeustracker_domain"})
+    return data_parsed
 ###############################################################################################################
 def download_MalwareDomainList():
     print("############################## Malware Domain ##############################")
     URL = "http://www.malwaredomainlist.com/mdlcsv.php"
+    list_field = ["date_UTC","domain","ip","reverse_lookup","description","","ASN","no_defined2","country_code","no_defined3"]
     data_txt = req_get(URL)
-    data_parsed = convert_data(data_txt)
-    return
+    data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"malwaredomainlist"})
+    return data_parsed
 ###############################################################################################################
 def download_IPSpamList():
     print("############################## IP spam list ##############################")
     URL = "http://www.ipspamlist.com/public_feeds.csv"
     data_txt = req_get(URL)
-    data_parsed = convert_data(data_txt)
-    return
+    data_parsed = convert_data(data_txt,aditional_data={"source_ioc":"ipspamlist"})
+    return data_parsed
+###############################################################################################################
 ###############################################################################################################
 if __name__ == "__main__":
-    download_Zeus_Domain()
-    #download_Zeus_IP()
-    #download_MalwareDomainList()
-    #download_IPSpamList()
+    #Fuentes de IOC
+    list_sources_IOC=[
+    {
+        "list_field" : ["ip"],
+        "url" : "https://zeustracker.abuse.ch/blocklist.php?download=ipblocklist",
+        "aditional_data": {"source_ioc":"zeustracker_ip"}
+    },
+    {
+        "list_field" : ["domain"],
+        "url" : "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist",
+        "aditional_data" : {"source_ioc":"zeustracker_domain"}
+    },
+    {
+        "list_field" : ["date_UTC","domain","ip","reverse_lookup","description","","ASN","no_defined2","country_code","no_defined3"],
+        "url" : "http://www.malwaredomainlist.com/mdlcsv.php",
+        "aditional_data" : {"source_ioc":"malwaredomainlist"}
+    },
+    {
+        "list_field" : [""],
+        "url" : "http://www.ipspamlist.com/public_feeds.csv",
+        "aditional_data" : {"source_ioc":"ipspamlist"}
+    }
+    ]
+    for source_IOC in list_sources_IOC:
+        URL = source_IOC['url']
+        aditional_data = source_IOC['aditional_data']
+        list_field = source_IOC['list_field']
+        data_txt = req_get(URL)
+        if(len(list_field)>0):
+            data_parsed = convert_data(data_txt,list_field=list_field,aditional_data=aditional_data)
+        else:
+            data_parsed = convert_data(data_txt,aditional_data=aditional_data)
+        time.sleep(5)
+    #data_json = download_Zeus_IP()
+    #data_json = download_Zeus_Domain()
+    #data_json = download_MalwareDomainList()
+    #data_json = download_IPSpamList()
