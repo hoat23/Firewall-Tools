@@ -24,7 +24,7 @@ from utils import *
 ###############################################################################################################
 def req_get(URL_API,data="",timeout=None):
     rpt = requests.get( url=URL_API , timeout=timeout)
-    print("[GET]: "+ str(rpt.status_code) +" | "+ str(rpt.reason))
+    print("[GET]: "+ str(rpt.status_code) +" | "+ str(rpt.reason)+ " | url: "+URL_API)
     return rpt.text
 ###############################################################################################################
 def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
