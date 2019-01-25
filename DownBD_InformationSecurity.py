@@ -33,9 +33,9 @@ def req_get(URL_API,data="",timeout=None):
     #print(str(rpt.json))
     return rpt.text
 ###############################################################################################################
-def convert_data(data_txt,list_field=None,aditional_data={}):
+def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
     num=0
-    data_txt = data_txt.replace("\"","")
+    #data_txt = data_txt.replace("\"","")
     data_txt = data_txt.replace("\r","")
     list_lines = data_txt.split('\n')
     for line in list_lines:
@@ -45,13 +45,14 @@ def convert_data(data_txt,list_field=None,aditional_data={}):
             else:
                 num=num+1
                 if(num==1 and list_field==None):
-                    list_field = line.split(',')
+                    list_field = line.split(split_char)
                 else:
-                    list_value = line.split(',')
-                    line_json = list2json(list_field,list_value)
+                    list_value = line.split(split_char)
+                    line_json = list2json(list_field,list_value,remove_char="\"")
+                    aditional_data.update({"source_id":num})
                     line_json.update(aditional_data)
-                    print_json(line_json)
-            print("{0:03d}. {1}".format(num,line))
+                    #print_json(line_json)
+            #print("{0:03d}. {1}".format(num,line))
 ###############################################################################################################
 def download_HahilTAAXI():
     HailATaxiiFeedList=[
@@ -96,7 +97,6 @@ def download_Zeus_IP():
     list_field = ["ip"]
     data_txt = req_get(URL)
     data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"zeustracker_ip"})
-    send_json(data_parsed,IP=ip_logstash,PORT=port_logstash)
     return data_parsed
 ###############################################################################################################
 def download_Zeus_Domain():
@@ -112,7 +112,7 @@ def download_MalwareDomainList():
     URL = "http://www.malwaredomainlist.com/mdlcsv.php"
     list_field = ["date_UTC","domain","ip","reverse_lookup","description","","ASN","no_defined2","country_code","no_defined3"]
     data_txt = req_get(URL)
-    data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"malwaredomainlist"})
+    data_parsed = convert_data(data_txt,list_field=list_field,aditional_data={"source_ioc":"malwaredomainlist"},split_char='\",')
     return data_parsed
 ###############################################################################################################
 def download_IPSpamList():
@@ -129,34 +129,40 @@ if __name__ == "__main__":
     {
         "list_field" : ["ip"],
         "url" : "https://zeustracker.abuse.ch/blocklist.php?download=ipblocklist",
-        "aditional_data": {"source_ioc":"zeustracker_ip"}
+        "aditional_data": {"source_ioc":"zeustracker_ip"},
+        "split_char": ","
     },
     {
         "list_field" : ["domain"],
         "url" : "https://zeustracker.abuse.ch/blocklist.php?download=domainblocklist",
-        "aditional_data" : {"source_ioc":"zeustracker_domain"}
+        "aditional_data" : {"source_ioc":"zeustracker_domain"},
+        "split_char": ","
     },
     {
         "list_field" : ["date_UTC","domain","ip","reverse_lookup","description","","ASN","no_defined2","country_code","no_defined3"],
         "url" : "http://www.malwaredomainlist.com/mdlcsv.php",
-        "aditional_data" : {"source_ioc":"malwaredomainlist"}
+        "aditional_data" : {"source_ioc":"malwaredomainlist"},
+        "split_char": "\","
     },
     {
-        "list_field" : [""],
+        "list_field" : [],
         "url" : "http://www.ipspamlist.com/public_feeds.csv",
-        "aditional_data" : {"source_ioc":"ipspamlist"}
+        "aditional_data" : {"source_ioc":"ipspamlist"},
+        "split_char": ","
     }
     ]
+    
     for source_IOC in list_sources_IOC:
         URL = source_IOC['url']
         aditional_data = source_IOC['aditional_data']
         list_field = source_IOC['list_field']
+        split_char = source_IOC['split_char']
         data_txt = req_get(URL)
         if(len(list_field)>0):
-            data_parsed = convert_data(data_txt,list_field=list_field,aditional_data=aditional_data)
+            data_parsed = convert_data(data_txt,list_field=list_field,aditional_data=aditional_data,split_char=split_char)
         else:
-            data_parsed = convert_data(data_txt,aditional_data=aditional_data)
-        time.sleep(5)
+            data_parsed = convert_data(data_txt,aditional_data=aditional_data,split_char=split_char)
+        send_json(data_parsed,IP=ip_logstash,PORT=port_logstash)
     #data_json = download_Zeus_IP()
     #data_json = download_Zeus_Domain()
     #data_json = download_MalwareDomainList()
