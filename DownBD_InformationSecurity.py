@@ -45,6 +45,7 @@ def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
                     line_json = list2json(list_field,list_value,remove_char="\"")
                     aditional_data.update({"source_id":num})
                     line_json.update(aditional_data)
+                    send_json(line_json,IP="127.0.0.1",PORT="5959")
                     #print_json(line_json)
             #print("{0:03d}. {1}".format(num,line))
 ###############################################################################################################
@@ -117,10 +118,6 @@ def download_IPSpamList():
     return data_parsed
 ###############################################################################################################
 if __name__ == "__main__":
-    
-    ip_logstash = "127.0.0.1"
-    port_logstash = "5959"
-
     #Fuentes de IOC
     list_sources_IOC=[
     {
@@ -159,4 +156,3 @@ if __name__ == "__main__":
             data_parsed = convert_data(data_txt,list_field=list_field,aditional_data=aditional_data,split_char=split_char)
         else:
             data_parsed = convert_data(data_txt,aditional_data=aditional_data,split_char=split_char)
-        send_json(data_parsed,IP=ip_logstash,PORT=port_logstash)
