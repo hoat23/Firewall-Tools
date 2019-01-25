@@ -16,7 +16,7 @@ Hail-TAAXI-Malware URL: http://hailataxii.com/taxii-discovery-service
 #Code base: https://stackoverflow.com/questions/46654721/stix-taxii-python3-cabby-api-getting-data-into-a-format-i-can-use
 ###############################################################################################################
 import pprint
-from cabby import create_client
+#from cabby import create_client
 import sys, requests, json
 from datetime import datetime, timedelta
 from time import time
@@ -45,8 +45,9 @@ def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
                     line_json = list2json(list_field,list_value,remove_char="\"")
                     aditional_data.update({"source_id":num})
                     line_json.update(aditional_data)
-                    send_json(line_json,IP="127.0.0.1",PORT="5959")
-                    #print_json(line_json)
+                    send_json(line_json,IP="54.208.72.130",PORT="5959")
+                    print_json(line_json)
+                    time.sleep(0.200)
             #print("{0:03d}. {1}".format(num,line))
 ###############################################################################################################
 def download_HahilTAAXI():
