@@ -14,7 +14,7 @@ Hail-TAAXI-Malware URL: http://hailataxii.com/taxii-discovery-service
 """
 #https://media.readthedocs.org/pdf/libtaxii/latest/libtaxii.pdf
 #Code base: https://stackoverflow.com/questions/46654721/stix-taxii-python3-cabby-api-getting-data-into-a-format-i-can-use
-
+###############################################################################################################
 import pprint
 from cabby import create_client
 import sys, requests, json
@@ -24,13 +24,7 @@ from utils import *
 ###############################################################################################################
 def req_get(URL_API,data="",timeout=None):
     rpt = requests.get( url=URL_API , timeout=timeout)
-    
-    #if not( (rpt.status_code)==200 or (rpt.status_code)==201 ):
     print("[GET]: "+ str(rpt.status_code) +" | "+ str(rpt.reason))
-    #print("print text")
-    #print(rpt.text)
-    #print("print json")
-    #print(str(rpt.json))
     return rpt.text
 ###############################################################################################################
 def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
@@ -122,8 +116,11 @@ def download_IPSpamList():
     data_parsed = convert_data(data_txt,aditional_data={"source_ioc":"ipspamlist"})
     return data_parsed
 ###############################################################################################################
-###############################################################################################################
 if __name__ == "__main__":
+    
+    ip_logstash = "8.8.8.8"
+    port_logstash = "5959"
+
     #Fuentes de IOC
     list_sources_IOC=[
     {
@@ -163,7 +160,3 @@ if __name__ == "__main__":
         else:
             data_parsed = convert_data(data_txt,aditional_data=aditional_data,split_char=split_char)
         send_json(data_parsed,IP=ip_logstash,PORT=port_logstash)
-    #data_json = download_Zeus_IP()
-    #data_json = download_Zeus_Domain()
-    #data_json = download_MalwareDomainList()
-    #data_json = download_IPSpamList()
