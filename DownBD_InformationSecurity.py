@@ -45,9 +45,9 @@ def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
                     line_json = list2json(list_field,list_value,remove_char="\"")
                     aditional_data.update({"source_id":num})
                     line_json.update(aditional_data)
-                    send_json(line_json,IP="54.208.72.130",PORT="5959")
-                    print_json(line_json)
-                    time.sleep(0.200)
+                    send_json(line_json,IP="127.0.0.0",PORT=5959)
+                    #print_json(line_json)
+                    #time.sleep(0.200)
             #print("{0:03d}. {1}".format(num,line))
 ###############################################################################################################
 def download_HahilTAAXI():
