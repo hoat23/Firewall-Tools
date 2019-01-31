@@ -12,7 +12,6 @@ import sys, json, socket, time, argparse
 from utils import *
 ###############################################################################
 #  VARIABLES GLOBALES
-ip = port = user = passw = command = None
 ip_logstash = port_logstash = typeDevice = None
 ###############################################################################
 def get_lista(lineTxt,char_split=" "):
@@ -219,28 +218,31 @@ def shm_table_to_json(simple_lista):
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
 ###############################################################################
-def process_table_to_list_json(simple_lista):
+def process_table_to_json(simple_lista):
     simple_lista = simple_lista.replace(" <","<")
     list_lines = simple_lista.split('\n')
     list_header = ["process_name","pid","process_status","cpu_usage","mem_usage"]
     cont = cont_proc = 1
     list_process = []
+    header_json = {}
     for line in list_lines:
         lista_json = {}
-        level, lista = get_lista(line)
-        if(len(line)>0):
+        if(len(line)>0 and cont>1):
+            level, lista = get_lista(line)
             if cont==2 :
-                lista_json = process_header(lista)
+                header_json = process_header(lista)
             elif cont>2 :
                 lista_json = list2json(list_header, lista,type_data=['str','int','str','float','float'])
                 lista_json.update({"pos":cont_proc})
                 cont_proc = cont_proc + 1
-            cont = cont + 1
-        if(len(lista_json)>0):
-            list_process.append(lista_json)
-            #print(lista_json)
+            
+            if(len(lista_json)>0):
+                list_process.append(lista_json)
+                #print(lista_json)
         #print("{0:02d} [{1}]".format(cont,line))
-    return list_process
+        cont = cont + 1
+    data_json = { 'sys_summary': header_json , 'table_process': list_process}
+    return data_json
 ###############################################################################
 def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
     ssh = pmk.SSHClient()
@@ -255,18 +257,22 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
         return ssh
     return
 ###############################################################################
-def ssh_exec_command(ssh_obj,command):
+def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233):
     ssh_stdin = ssh_stdout = ssh_sterr = None
+    obj_extern = False
+    if(ssh_obj==None):
+        ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
+        obj_extern = True
     in_, out_, error = ssh_obj.exec_command(command)
+    if(obj_extern):
+        ssh_obj.close()
     #print(str(error.read()))
     output_txt = out_.read()
     error_txt = error.read()
     return output_txt,error_txt
 ###############################################################################
-def ssh_download_config(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,device="forti"):
+def ssh_download_config(ssh_obj, device="forti"):
     #http://www.unixfu.ch/diag-sys-top-2/
-    ssh_obj = ssh_connect(IP,USER,PASS,PORT)
-    
     print(str(device))
     if(device=="forti"):
         print("forti")
@@ -282,54 +288,28 @@ def ssh_download_config(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,device="f
         print(str(errortxt))
         
     file_down = fileTXT_save(outtxt,nameFile= time.strftime("%Y%m%d")+".txt" )
-    ssh_obj.close()
-    send_json({'@mensaje':file_down},IP=ip_logstash,PORT=port_logstash)
+    data_json.update({'backup_file':outtxt})
     return
 ###############################################################################
-def ssh_get_sysinfo_shm(IP=ip,USER=user,PASS=passw,PORT=port):
-    global ip_logstash , port_logstash
-    ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-    #"diagnose hardware sysinfo memory"
-    outtxt,errortxt = ssh_exec_command(ssh_obj,'diagnose hardware sysinfo shm')# --sort=name #ERROR: diag sys top-summary
-    ssh_obj.close()
+def ssh_get_sysinfo_shm(ssh_obj):
+    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo shm',ssh_obj=ssh_obj)
     data_json = shm_table_to_json(outtxt.decode('utf-8'))
-    print_json(data_json)
-    #send_json(lista_json,IP=ip_logstash,PORT=port_logstash)
-    return
+    return data_json
 ###############################################################################
-def ssh_get_sysinfo_conserve(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
-    global ip_logstash , port_logstash
-    ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-    #"diagnose hardware sysinfo memory"
-    outtxt,errortxt = ssh_exec_command(ssh_obj,'diagnose hardware sysinfo conserve')# --sort=name #ERROR: diag sys top-summary
-    ssh_obj.close()
+def ssh_get_sysinfo_conserve(ssh_obj):
+    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo conserve',ssh_obj=ssh_obj)
     data_json = conserve_sysinfo_to_list_json(outtxt.decode('utf-8'))
-    print_json(data_json)
-    #send_json(lista_json,IP=ip_logstash,PORT=port_logstash)
-    return
+    return data_json
 ###############################################################################
-def ssh_get_sysinfo_memory(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
-    global ip_logstash , port_logstash
-    ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-    #"diagnose hardware sysinfo memory"
-    outtxt,errortxt = ssh_exec_command(ssh_obj,'diagnose hardware sysinfo memory')# --sort=name #ERROR: diag sys top-summary
-    ssh_obj.close()
-    print(outtxt.decode('utf-8'))
+def ssh_get_sysinfo_memory(ssh_obj):
+    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo memory',ssh_obj=ssh_obj)
     data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
-    print_json(data_json)
-    #send_json(lista_json,IP=ip_logstash,PORT=port_logstash)
-    return
+    return data_json
 ###############################################################################
-def ssh_get_process_runing(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
-    global ip_logstash , port_logstash
-    ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-    #"diagnose hardware sysinfo memory"
-    outtxt,errortxt = ssh_exec_command(ssh_obj,'diag sys top 5 25 \x0fm')# --sort=name #ERROR: diag sys top-summary
-    ssh_obj.close()
-    list_process = process_table_to_list_json(errortxt.decode('utf-8'))
-    print_list(list_process)
-    #send_json(lista_json,IP=ip_logstash,PORT=port_logstash)
-    return
+def ssh_get_process_runing(ssh_obj):
+    outtxt,errortxt = ssh_exec_command('diag sys top 5 25 \x0fm',ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+    data_json = process_table_to_json(errortxt.decode('utf-8'))
+    return data_json
 ###############################################################################
 def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     lista_json = {
@@ -339,20 +319,30 @@ def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
 ###############################################################################
-def execute_by_command_cmd(command):
-    global ip , port , user , passw, ip_logstash, port_logstash, typeDevice
-    if (command=="sysinfo_shm"):
-        ssh_get_sysinfo_shm(IP=ip,USER=user,PASS=passw,PORT=port)
-    if (command=="sysinfo_conserve"):
-        ssh_get_sysinfo_conserve(IP=ip,USER=user,PASS=passw,PORT=port)
-    if (command=="sysinfo_memory"):
-        ssh_get_sysinfo_memory(IP=ip,USER=user,PASS=passw,PORT=port)
-    if(command=="check_process"):
-        ssh_get_process_runing(IP=ip,USER=user,PASS=passw,PORT=port)
-    if(command=="down_config"):
-        ssh_download_config(IP=ip,USER=user,PASS=passw,PORT=port,device=typeDevice)
-    if(command=="test_logstash_conection"):
-        test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
+def execute_by_command(command_input, ip , port , user , passw):
+    global ip_logstash, port_logstash, typeDevice
+    ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
+    data_json = {}
+    list_command = command_input.split(",")
+    for command in list_command:
+        if (command=="sysinfo_shm"):
+            data_json.update( { 'sysinfo_shm' : ssh_get_sysinfo_shm(ssh_obj)} )
+
+        if (command=="sysinfo_conserve"):
+            data_json.update( { 'sysinfo_conserve' : ssh_get_sysinfo_conserve(ssh_obj)} )
+        
+        if (command=="sysinfo_memory"):
+            data_json.update( { 'sysinfo_memory' : ssh_get_sysinfo_memory(ssh_obj)} )
+
+        if(command=="check_process"):
+            data_json.update( { 'check_process' : ssh_get_process_runing(ssh_obj)} )
+        if(command=="down_config"):
+            data_json.update( { 'down_config' : ssh_download_config(ssh_obj,device=typeDevice)} )
+        if(command=="test_logstash_conection"):
+            test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
+    
+    print_json(data_json)
+    ssh_obj.close()
     return
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
@@ -362,8 +352,9 @@ def ping_test(IP="0.0.0.0"):
     return rpt_ping
 ###############################################################################
 def get_parametersCMD():
-    global ip , port , user , passw , command , ip_logstash , port_logstash, typeDevice
+    global ip_logstash , port_logstash, typeDevice
     parser = argparse.ArgumentParser()
+    
     parser.add_argument("-i","--ip",help="Direccion ip del host")
     parser.add_argument("-pp","--port",help="Puerto del host")
     parser.add_argument("-u","--user",help="Usuario SSH")
@@ -394,7 +385,7 @@ def get_parametersCMD():
         print("ip_out\t= ["+str(ip_logstash)+"]\npp_out\t= ["+str(port_logstash)+"]")
         sys.exit(0)
     
-    execute_by_command_cmd(command)
+    execute_by_command(command, ip , port , user , passw)
     return
 ###############################################################################
 if __name__=="__main__":
