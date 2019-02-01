@@ -8,11 +8,8 @@
 #http://46.101.4.154/Art�culos%20t�cnicos/Python/Paramiko%20-%20Conexiones%20SSH%$
 #
 import paramiko as pmk
-import sys, json, socket, time, argparse
+import sys, json, socket, time, argparse, datetime
 from utils import *
-###############################################################################
-#  VARIABLES GLOBALES
-ip_logstash = port_logstash = typeDevice = None
 ###############################################################################
 def get_lista(lineTxt,char_split=" "):
     Lista = lineTxt.split(char_split)
@@ -319,8 +316,7 @@ def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
 ###############################################################################
-def execute_by_command(command_input, ip , port , user , passw):
-    global ip_logstash, port_logstash, typeDevice
+def execute_by_command(command_input, ip , port , user , passw, typeDevice='forti'):
     ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
     data_json = {}
     list_command = command_input.split(",")
@@ -336,14 +332,14 @@ def execute_by_command(command_input, ip , port , user , passw):
 
         if(command=="check_process"):
             data_json.update( { 'check_process' : ssh_get_process_runing(ssh_obj)} )
+
         if(command=="down_config"):
             data_json.update( { 'down_config' : ssh_download_config(ssh_obj,device=typeDevice)} )
+
         if(command=="test_logstash_conection"):
             test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
-    
-    print_json(data_json)
     ssh_obj.close()
-    return
+    return data_json
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
     rpt_ping="DOWN"
@@ -351,10 +347,18 @@ def ping_test(IP="0.0.0.0"):
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
+def get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash='0.0.0.0', port_logstash=2323):
+    data_json = execute_by_command(command, ip , port , user , passw, typeDevice='forti')
+    data_json.update({'rename_index':'heartbeat' , 'datetime' : datetime.utcnow().isoformat() , "devip" : ip})
+    if( isAliveIP(ip_logstash) ):
+        send_json(data_json,IP=ip_logstash,PORT=port_logstash)
+        #print_json(data_json)
+    return
+###############################################################################
 def get_parametersCMD():
-    global ip_logstash , port_logstash, typeDevice
+    ip_logstash = port_logstash = typeDevice = None
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument("-i","--ip",help="Direccion ip del host")
     parser.add_argument("-pp","--port",help="Puerto del host")
     parser.add_argument("-u","--user",help="Usuario SSH")
@@ -384,8 +388,8 @@ def get_parametersCMD():
         print("\nERROR: Faltan parametros.")
         print("ip_out\t= ["+str(ip_logstash)+"]\npp_out\t= ["+str(port_logstash)+"]")
         sys.exit(0)
-    
-    execute_by_command(command, ip , port , user , passw)
+    print("iplogstash:"+ip_logstash)
+    get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash=ip_logstash, port_logstash=port_logstash)
     return
 ###############################################################################
 if __name__=="__main__":
