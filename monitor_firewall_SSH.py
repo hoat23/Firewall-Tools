@@ -111,7 +111,7 @@ def process_header(lista):
         val = val.replace(",","")
         val = val.replace(";","")
         lista[i]=val
-    
+
     val = lista[0].replace("U","")
     lista_json.update({'cpu_usage_app': int(val)})
 
@@ -123,24 +123,34 @@ def process_header(lista):
 
     val = lista[3].replace("I","")
     lista_json.update({'cpu_usage_app_inactive': int(val)})
-        
-    val = lista[4].replace("WA","")
-    lista_json.update({'cpu_time_wait_IO': int(val)})
+    
+    if (len(lista)==10):
+        val = lista[4].replace("WA","")
+        lista_json.update({'cpu_time_wait_IO': int(val)})
 
-    val = lista[5].replace("HI","")
-    lista_json.update({'cpu_time_wait_hardware_interruption': int(val)})
+        val = lista[5].replace("HI","")
+        lista_json.update({'cpu_time_wait_hardware_interruption': int(val)})
 
-    val = lista[6].replace("SI","")
-    lista_json.update({'cpu_time_wait_software_interruption': int(val)})
+        val = lista[6].replace("SI","")
+        lista_json.update({'cpu_time_wait_software_interruption': int(val)})
 
-    val = lista[7].replace("ST","")
-    lista_json.update({'cpu_time_wait_cpu_virtual': int(val)})
+        val = lista[7].replace("ST","")
+        lista_json.update({'cpu_time_wait_cpu_virtual': int(val)})
 
-    val = lista[8].replace("T","")
-    lista_json.update({'total_memory': int(val)})
+        val = lista[8].replace("T","")
+        lista_json.update({'total_memory': int(val)})
 
-    val = lista[9].replace("F","")
-    lista_json.update({'free_memory': int(val)})
+        val = lista[9].replace("F","")
+        lista_json.update({'free_memory': int(val)})
+    elif (len(lista)==6):  
+        val = lista[4].replace("T","")
+        lista_json.update({'total_memory': int(val)})
+
+        val = lista[5].replace("F","")
+        lista_json.update({'free_memory': int(val)})
+    else:
+        print("[WARN] lista=["+str(lista)+"]")
+    
 
     #val = lista[].replace("KF","")
     #lista_json.update({'kernel_free_memory': (val)})
@@ -169,38 +179,68 @@ def conserve_sysinfo_to_list_json(simple_lista):
                     data = { lista[0] : {"megabytes":int(lista[1]) ,"percentage" : int(aux) } }
                     data_json.update( data )
                 else:
-                    data_json.update( { lista[0]+"_MB" :int(lista[1]) } )
+                    try:
+                        data_json.update( { lista[0]+"_MB" :int(lista[1]) } )
+                    except:
+                        data_json.update( { lista[0]+"_MB" : (lista[1]) } )
         cont = cont + 1
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
 ###############################################################################
 def memory_sysinfo_to_list_json(simple_lista):
+    michi = simple_lista.find("#")
+    simple_lista = simple_lista[michi+1:]
     simple_lista = simple_lista.lower()
     simple_lista = simple_lista.replace("(","_")
     simple_lista = simple_lista.replace("):","")
     simple_lista = simple_lista.replace(" kb","")
-    simple_lista = simple_lista.replace(": ","_kb")
+    simple_lista = simple_lista.replace(":","_kb ")
     list_lines = simple_lista.split('\n')
     cont = 1
     list_shm = []
     data_json = {}
+    body = header = None
     for line in list_lines:
         if(line.find("#")>0):
             pass
         else:
             level, lista = get_lista(line)
             if(len(line)>0 and len(lista)>0):
-                data_json.update( { lista[0] : int(lista[1]) } )
+                if(len(lista)>2):
+                    if(header==None):
+                        header = lista
+                    if(body==None):
+                        body = lista
+                    if(header!=None and body!=None):
+                        data_json = {
+                            body[0] : {
+                                header[0]: body[1], 
+                                header[0]: body[2], 
+                                header[0]: body[3],
+                                header[0]: body[4],
+                                header[0]: body[5],
+                                header[0]: body[6]
+                            }
+                        }
+                else:
+                    data_json.update( { lista[0] : int(lista[1]) } )
         cont = cont + 1
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
 ###############################################################################
 def shm_table_to_json(simple_lista):
+    michi = simple_lista.find("#")
+    simple_lista = simple_lista[michi+1:]
     simple_lista = simple_lista.replace(" MB","MB")
     simple_lista = simple_lista.replace("SHM ","shm_")
     simple_lista = simple_lista.replace("FS ","fs_")
     simple_lista = simple_lista.replace(": ","")
+    simple_lista = simple_lista.replace("conserve mode","conserve_mode")
+    simple_lista = simple_lista.replace("system last entered","sys_last_entered")
+    simple_lista = simple_lista.replace("sys fd last entered","sys_fd_last_entered")
+
     list_lines = simple_lista.split('\n')
+    
     cont = 1
     list_shm = []
     data_json = {}
@@ -210,7 +250,10 @@ def shm_table_to_json(simple_lista):
         else:
             level, lista = get_lista(line)
             if(len(line)>0 and len(lista)>0):
-                data_json.update( { lista[0] : int(lista[1]) } )
+                if(lista[0]=="conserve_mode" or lista[0]=="sys_last_entered" or lista[0]=="sys_fd_last_entered"):
+                    data_json.update( { lista[0] : (lista[1]) } )
+                else:
+                    data_json.update( { lista[0] : int(lista[1]) } )
         cont = cont + 1
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
@@ -229,7 +272,7 @@ def process_table_to_json(simple_lista):
             if cont==2 :
                 header_json = process_header(lista)
             elif cont>2 :
-                lista_json = list2json(list_header, lista,type_data=['str','int','str','float','float'])
+                lista_json = list2json(list_header, lista)#,type_data=['str','int','str','float','float'])
                 lista_json.update({"pos":cont_proc})
                 cont_proc = cont_proc + 1
             
@@ -242,30 +285,32 @@ def process_table_to_json(simple_lista):
     return data_json
 ###############################################################################
 def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233):
-    ssh = pmk.SSHClient()
     try:
+        ssh = pmk.SSHClient()
         ssh.set_missing_host_key_policy(pmk.AutoAddPolicy())
         ssh_stdin = ssh_stdout = ssh_sterr = None
         ssh.connect(IP , port=PORT ,username=USER , password=PASS,look_for_keys=False,allow_agent=False)
-        print("[INFO] : ssh_connect() -> Conected {0}@{1}".format(USER,IP))
+        #print("[INFO] : ssh_connect() -> Conected {0}@{1}".format(USER,IP))
+        return ssh
     except:
         print("[ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0]) )
-    finally:
-        return ssh
-    return
+        return ""
 ###############################################################################
 def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233):
     ssh_stdin = ssh_stdout = ssh_sterr = None
     obj_extern = False
-    if(ssh_obj==None):
-        ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-        obj_extern = True
-    in_, out_, error = ssh_obj.exec_command(command)
-    if(obj_extern):
-        ssh_obj.close()
-    #print(str(error.read()))
-    output_txt = out_.read()
-    error_txt = error.read()
+    try:
+        if(ssh_obj==None):
+            ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
+            obj_extern = True
+        in_, out_, error = ssh_obj.exec_command(command)
+        if(obj_extern):
+            ssh_obj.close()
+        #print(str(error.read()))
+        output_txt = out_.read()
+        error_txt = error.read()
+    except:
+        output_txt = error_txt = ""
     return output_txt,error_txt
 ###############################################################################
 def ssh_download_config(ssh_obj, device="forti"):
@@ -288,24 +333,28 @@ def ssh_download_config(ssh_obj, device="forti"):
     data_json.update({'backup_file':outtxt})
     return
 ###############################################################################
-def ssh_get_sysinfo_shm(ssh_obj):
-    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo shm',ssh_obj=ssh_obj)
+def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm'):
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
     data_json = shm_table_to_json(outtxt.decode('utf-8'))
+    data_json.update({'command' : command})
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_conserve(ssh_obj):
-    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo conserve',ssh_obj=ssh_obj)
+def ssh_get_sysinfo_conserve(ssh_obj, command='diagnose hardware sysinfo conserve'):
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
     data_json = conserve_sysinfo_to_list_json(outtxt.decode('utf-8'))
+    data_json.update({'command' : command})
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_memory(ssh_obj):
-    outtxt,errortxt = ssh_exec_command('diagnose hardware sysinfo memory',ssh_obj=ssh_obj)
+def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
     data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
+    data_json.update({'command' : command})
     return data_json
 ###############################################################################
-def ssh_get_process_runing(ssh_obj):
-    outtxt,errortxt = ssh_exec_command('diag sys top 5 25 \x0fm',ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm'):
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
     data_json = process_table_to_json(errortxt.decode('utf-8'))
+    data_json.update({'command' : command})
     return data_json
 ###############################################################################
 def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
@@ -316,30 +365,35 @@ def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
 ###############################################################################
-def execute_by_command(command_input, ip , port , user , passw, typeDevice='forti'):
+def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='forti'):
     ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
+    
     data_json = {}
-    list_command = command_input.split(",")
-    for command in list_command:
-        if (command=="sysinfo_shm"):
-            data_json.update( { 'sysinfo_shm' : ssh_get_sysinfo_shm(ssh_obj)} )
+    if ssh_obj=="" :
+        return {'status': 'error'}
+    else:
+        list_command = command_input.split(",")
+        for command in list_command:
+            if (command=="sysinfo_shm"):
+                data_json.update( { 'sysinfo_shm' : ssh_get_sysinfo_shm(ssh_obj)} )
 
-        if (command=="sysinfo_conserve"):
-            data_json.update( { 'sysinfo_conserve' : ssh_get_sysinfo_conserve(ssh_obj)} )
-        
-        if (command=="sysinfo_memory"):
-            data_json.update( { 'sysinfo_memory' : ssh_get_sysinfo_memory(ssh_obj)} )
+            if (command=="sysinfo_conserve"):
+                data_json.update( { 'sysinfo_conserve' : ssh_get_sysinfo_conserve(ssh_obj)} )
+            
+            if (command=="sysinfo_memory"):
+                data_json.update( { 'sysinfo_memory' : ssh_get_sysinfo_memory(ssh_obj)} )
 
-        if(command=="check_process"):
-            data_json.update( { 'check_process' : ssh_get_process_runing(ssh_obj)} )
+            if(command=="check_process"):
+                data_json.update( { 'check_process' : ssh_get_process_runing(ssh_obj)} )
 
-        if(command=="down_config"):
-            data_json.update( { 'down_config' : ssh_download_config(ssh_obj,device=typeDevice)} )
+            if(command=="down_config"):
+                data_json.update( { 'down_config' : ssh_download_config(ssh_obj,device=typeDevice)} )
 
-        if(command=="test_logstash_conection"):
-            test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
-    ssh_obj.close()
-    return data_json
+            if(command=="test_logstash_conection"):
+                test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
+        data_json['status']='success'
+        ssh_obj.close()
+        return data_json
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
     rpt_ping="DOWN"
@@ -348,12 +402,19 @@ def ping_test(IP="0.0.0.0"):
     return rpt_ping
 ###############################################################################
 def get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash='0.0.0.0', port_logstash=2323):
-    data_json = execute_by_command(command, ip , port , user , passw, typeDevice='forti')
-    data_json.update({'rename_index':'heartbeat' , 'datetime' : datetime.utcnow().isoformat() , "devip" : ip})
+    data_json = ssh_execute_by_command(command, ip , port , user , passw, typeDevice='forti')
     if( isAliveIP(ip_logstash) ):
-        send_json(data_json,IP=ip_logstash,PORT=port_logstash)
-        #print_json(data_json)
-    return
+        if(data_json['status']!='error'):
+            del data_json['status']
+            for name_proccess in list(data_json):
+                data_json_by_command = {}
+                data_json_by_command = { name_proccess : data_json[name_proccess]}
+                data_json_by_command.update({'rename_index':'heartbeat' , 'datetime' : datetime.utcnow().isoformat() , "devip" : ip})
+                send_json(data_json_by_command,IP=ip_logstash,PORT=port_logstash)
+                #print_json(data_json_by_command)
+            return {'status':'success'}
+     
+    return {'status':'error'}
 ###############################################################################
 def get_parametersCMD():
     ip_logstash = port_logstash = typeDevice = None
@@ -388,7 +449,7 @@ def get_parametersCMD():
         print("\nERROR: Faltan parametros.")
         print("ip_out\t= ["+str(ip_logstash)+"]\npp_out\t= ["+str(port_logstash)+"]")
         sys.exit(0)
-    print("iplogstash:"+ip_logstash)
+    
     get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash=ip_logstash, port_logstash=port_logstash)
     return
 ###############################################################################
