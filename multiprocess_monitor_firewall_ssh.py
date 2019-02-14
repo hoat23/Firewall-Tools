@@ -10,42 +10,72 @@ from time import sleep
 from fortiOS_API import *
 import multiprocessing as mp
 import os, signal, sys
-from monitor_firewall_SSH import *
+from monitor_firewall_ssh import *
+from dictionary import *
 #########################################################################################
-def execute_get(ip, port, ip_logstash, port_logstash, return_dict, username = "user", password = "password", num_int=4):
+def execute_process(ip, port, logstash, return_dict, username, password, num_int=4):
     command = "check_process,sysinfo_shm,sysinfo_memory,sysinfo_conserve"
-    for i in range(1,num_int+1):
-        res = get_data_firewall_ssh(command, ip, port, username, password, ip_logstash, port_logstash)
+    intent = 1
+    while (intent <= num_int):
+        res = get_data_firewall_ssh(command, ip, port, username, password, logstash=logstash)
         if res['status']!="error" :
             break
-        sleep(1)
-    return_dict.update( {ip : {'status': res['status']}} )
-    res.update({'num_intent':i})
-    sleep(28)
+        #sleep(1)
+        intent = intent + 1
+    
+    if 'old_time' in res:
+        old_time = res['old_time'] 
+    else:
+        old_time = -1
+
+    if 'enlapsed_time' in res:    
+        enlapsed_time = res['enlapsed_time']
+    else:
+        enlapsed_time = -1
+
+    if(res['status']=="error" and intent>=num_int):
+        sleep(5)
+
+    data_json = {
+        ip : {
+            'status': res['status'],
+            'old_time': old_time,
+            'num_int': intent,
+            'enlapsed_time': enlapsed_time
+            }
+        }
+    if (float(enlapsed_time)>0 and 30 - float(enlapsed_time)>0):
+        sleep(30.0-float(enlapsed_time))
+    else:
+        sleep(28)
+    
+    return_dict.update( data_json )
     return
 #########################################################################################
-def launch_watchdog(list_process,dict_pid_ip,ip_logstash,port_logstash,return_dict):
+def launch_watchdog(list_process, dict_pid_ip, logstash, return_dict, username, password):
     while(True):
         cont = 0
         #os.system('cls')
-        print("Proccess running . . . ")
-        print("Nª \t  IP             PID  \t  RUN  \t  STATUS   CLIENT")
+        #print("Proccess running . . . ")
+        sleep(2)
+        print("Nª           IP                 PID       RUN\tINT\tSTATUS\t ENL_TIME\t\tCLIENT")
         for p in list_process:
             ip = dict_pid_ip[p.pid]['ip']
             port = dict_pid_ip[p.pid]['port']
             client = dict_pid_ip[p.pid]['client']
             if(not p.is_alive()):
                 del dict_pid_ip[p.pid]
-                p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_get,args=(ip, port, ip_logstash, port_logstash, return_dict))
+                p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_process,args=(ip, port, logstash, return_dict, username, password))
                 p.daemon=True
                 p.start()
                 dict_pid_ip.update({ p.pid: {"ip":ip, "port":port, "client":client} })
                 list_process[cont]=p
-            print( '%02d     %015s:%05s    %06s    %06s   %010s   %010s' % (cont , ip , port , p.pid , p.is_alive(), return_dict[ip]['status'], client) )
+            print( '%02d  %015s:%05s    %06s    %06s   %02s  %010s %010s\t    %010s ' % 
+                   (cont , ip , port , p.pid , p.is_alive(), return_dict[ip]['num_int'], return_dict[ip]['status'], return_dict[ip]['enlapsed_time'], client) )
             cont = cont +1
-        sleep(2)
+    return
 #########################################################################################
-def init_multiprocessing(list_client, dict_client_ip,ip_logstash,port_logstash):
+def init_multiprocessing(list_client, dict_client_ip, logstash, username, password, enabled_watchdog=True):
     list_process_running = []
     manager = mp.Manager()
     return_dict = manager.dict()
@@ -57,47 +87,34 @@ def init_multiprocessing(list_client, dict_client_ip,ip_logstash,port_logstash):
             print(str(ip_json))
             ip = ip_json['ip']
             port = ip_json['port']['ssh']
+            data_json = {
+                ip : {
+                    'status': 'lauched',
+                    'num_int': -1,
+                    'old_time': 0,
+                    'enlapsed_time': -1
+                    }
+                }
+            return_dict.update( data_json )
             # Init by process by IP:PORT
-            p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_get,args=(ip, port, ip_logstash, port_logstash, return_dict))
-            return_dict.update( {ip : {'status': 'lauched'}} )
+            p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_process,args=(ip, port, logstash, return_dict, username, password))
             p.daemon = True
             p.start()
             dict_pid_ip.update({ p.pid: {"ip":ip, "port":port, "client":client} })
             list_process_running.append(p)
     print("--> [  END] process are launched.")
-    launch_watchdog(list_process_running,dict_pid_ip,ip_logstash,port_logstash,return_dict)
+    if (enabled_watchdog):
+        launch_watchdog(list_process_running, dict_pid_ip, logstash, return_dict, username, password)
+    else:
+        for p in list_process_running:
+            p.join()
+        print("--> [END] all process finished.")
     return
 #########################################################################################
 if __name__ == "__main__":
     print("--> [START] check_cpu_mem.py")
-    ip_logstash = "8.8.8.8" 
-    port_logstash = 2323
-    list_client_to_execute=["cliente01","cliente02"]
-    dict_client_ip = {
-        "cliente" : 
-            [{
-            "ip" : "0.0.0.0",
-            "port": {
-                "ssh": 22222,
-                "http": 9443
-                }
-            }],
-        "cliente02" : 
-            [{
-            "ip" : "1.1.1.1",
-            "port": {
-                "ssh": 1337,
-                "http": 9443
-                }
-            },
-            {
-            "ip" : "181.176.188.202",
-            "port": {
-                "ssh": 1337,
-                "http": 9443
-                }
-            }]
-    }
-
-    init_multiprocessing(list_client_to_execute, dict_client_ip,ip_logstash,port_logstash)
+    #list_client_to_execute=["alianza","aje","alexim","babyclubchic","bdo","brexia","crp","ohsjdd","comexa","continental","cosapi","cpal","disal","dispercol","divemotors","egemsa","enapu","famesa","fibertel","filasur","gomelst","happyland","imm","ind_marique","ifreserve","ingenyo","itochu","la_llave","lab_hofarm","labocer","mastercol","movilmax","orval","proinversion","san_silvestre","santo_domingo","socios_en_salud","supra","thomas_greg","trofeos_castro","uladech","univ_per_union","valle_alto","zinsa","upch","tasa","prompe","engie","cdtel"]
+    list_client_to_execute=["alianza","aje"]
+    #list_client_to_execute=["alianza","aje","alexim","babyclubchic","bdo","brexia","crp","ohsjdd","comexa","continental","cosapi","cpal","disal","dispercol","divemotors","egemsa","enapu","famesa","fibertel","filasur","gomelst","happyland","imm","ind_marique","ifreserve","la_llave","lab_hofarm","labocer","mastercol","movilmax","proinversion","san_silvestre","santo_domingo","socios_en_salud","supra","thomas_greg","trofeos_castro","univ_per_union","zinsa","upch","tasa","prompe","engie","cdtel"]
+    init_multiprocessing(list_client_to_execute, dict_client_ip, logstash, username, password)
 #########################################################################################
