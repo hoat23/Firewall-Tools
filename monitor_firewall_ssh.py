@@ -7,9 +7,9 @@
 #https://cpiekarski.com/2011/05/09/super-easy-python-json-client-server/
 #http://46.101.4.154/Art�culos%20t�cnicos/Python/Paramiko%20-%20Conexiones%20SSH%$
 #
+import sys, json, socket, argparse, datetime, time
 import paramiko as pmk
-import sys, json, socket, time, argparse, datetime
-from utils import *
+from utils import send_json, list2json, print_json
 ###############################################################################
 def get_lista(lineTxt,char_split=" "):
     Lista = lineTxt.split(char_split)
@@ -285,6 +285,20 @@ def process_table_to_json(simple_lista):
     data_json = { 'sys_summary': header_json , 'table_process': list_process}
     return data_json
 ###############################################################################
+def sys_status_to_json(simple_lista):
+    michi = simple_lista.find("#")
+    simple_lista = simple_lista[michi+2:]
+    list_lines = simple_lista.split('\n')
+    data_json = {}
+    for line in list_lines:
+        pos = line.find(':')
+        if(pos>0):
+            field = line[:pos]
+            value = line[pos+2:len(line)]
+            #print(" ->" + field+ ":"+value)
+            data_json.update( {field:value} )
+    return data_json
+###############################################################################
 def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retry_interval=100, num_intent=3):
     #https://netdevops.me/2017/waiting-for-ssh-service-to-be-ready-with-paramiko/
     ssh = pmk.SSHClient()
@@ -308,7 +322,8 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
             #print("[INFO] : ssh_conect() {0}@{1} SSH transport is not ready.".format(USER,IP))
             continue
         except:
-            print("{3} [ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.utcnow().isoformat()))
+            #print("{3} [ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.utcnow().isoformat()))
+            print("[ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0]))
             return ""
         cont_intent = cont_intent + 1
         time.sleep(retry_interval)
@@ -332,7 +347,8 @@ def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='passwor
 ###############################################################################
 def ssh_download_config(ssh_obj, device="forti"):
     #http://www.unixfu.ch/diag-sys-top-2/
-    print(str(device))
+    data_json={}
+    #print(str(device))
     if(device=="forti"):
         print("forti")
         outtxt,errortxt = ssh_exec_command(ssh_obj, "show full-configuration")#command by forti device
@@ -341,14 +357,19 @@ def ssh_download_config(ssh_obj, device="forti"):
         outtxt,errortxt = ssh_exec_command(ssh_obj, "configure\n") #command by paloalto device
         print(str(outtxt))
         print(str(errortxt))
-        
         outtxt,errortxt = ssh_exec_command(ssh_obj, "show")
         print(str(outtxt))
         print(str(errortxt))
         
     file_down = fileTXT_save(outtxt,nameFile= time.strftime("%Y%m%d")+".txt" )
     data_json.update({'backup_file':outtxt})
-    return
+    return data_json
+###############################################################################
+def ssh_get_sys_status(ssh_obj, command='get system status'):
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
+    data_json = sys_status_to_json(outtxt.decode('utf-8'))
+    data_json.update({'command' : command})
+    return data_json
 ###############################################################################
 def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm'):
     outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
@@ -378,42 +399,58 @@ def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     lista_json = {
         '@message' : 'python test message logtash',
         '@tags' : ['python', 'test']
+        #'datetime': "{0}".format(datetime.utcnow().isoformat())
     }
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
 ###############################################################################
-def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='forti'):
+def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='forti', logstash={}):
     ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
     
     data_json = {}
+    flag_error = False
     if ssh_obj=="" or ssh_obj==None :
-        return {'status': 'error'}
+        print("[ERROR] ssh_execute_by_command | ssh_obj:{0}".format(ssh_obj))
+        flag_error = True
     else:
         list_command = command_input.split(",")
         for command in list_command:
+            if (command=="sys_status"):
+                rpt_json = ssh_get_sys_status(ssh_obj)
             if (command=="sysinfo_shm"):
-                data_json.update( { 'sysinfo_shm' : ssh_get_sysinfo_shm(ssh_obj)} )
-
+                rpt_json = ssh_get_sysinfo_shm(ssh_obj)
             if (command=="sysinfo_conserve"):
-                data_json.update( { 'sysinfo_conserve' : ssh_get_sysinfo_conserve(ssh_obj)} )
-            
+                rpt_json = ssh_get_sysinfo_conserve(ssh_obj)
             if (command=="sysinfo_memory"):
-                data_json.update( { 'sysinfo_memory' : ssh_get_sysinfo_memory(ssh_obj)} )
-
+                rpt_json = ssh_get_sysinfo_memory(ssh_obj)
             if(command=="check_process"):
-                data_json.update( { 'check_process' : ssh_get_process_runing(ssh_obj)} )
-
+                rpt_json = ssh_get_process_runing(ssh_obj)
             if(command=="down_config"):
-                data_json.update( { 'down_config' : ssh_download_config(ssh_obj,device=typeDevice)} )
-
+                rpt_json = ssh_download_config(ssh_obj,device=typeDevice)
             if(command=="test_logstash_conection"):
-                test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
-        data_json['status']='success'
+                try:
+                    ip_logstash = logstash['ip']
+                    port_logstash = logstash['port']
+                    test_logstash_conection(IP_LOGSTASH=ip_logstash,PORT_LOGSTASH=port_logstash)
+                    rpt_json.update( {command : { 'status' : 'success'} })
+                except:
+                    rpt_json.update( {command : { 'status' : 'error'} })
+            if len(rpt_json)>0:
+                rpt_json.update( {'status' : 'success'} )
+            else:
+                rpt_json.update( {'status' : 'error'} )
+                flag_error=True
+            data_json.update( { command : rpt_json } )
+            
         try: #H23 - mejorar el manejo de errores y parseo para multiprocesos
             ssh_obj.close()
         except:
             pass
-        return data_json
+    if (flag_error):
+        data_json.update( {'status': 'error'} )
+    else:
+        data_json.update( {'status': 'success'} )
+    return data_json
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
     rpt_ping="DOWN"
@@ -421,20 +458,36 @@ def ping_test(IP="0.0.0.0"):
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
-def get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash='0.0.0.0', port_logstash=2323):
-    data_json = ssh_execute_by_command(command, ip , port , user , passw, typeDevice='forti')
-    if( isAliveIP(ip_logstash) ):
-        if(data_json['status']!='error'):
-            del data_json['status']
-            for name_proccess in list(data_json):
-                data_json_by_command = {}
-                data_json_by_command = { name_proccess : data_json[name_proccess]}
-                data_json_by_command.update({'rename_index':'heartbeat' , 'datetime' : datetime.utcnow().isoformat() , "devip" : ip})
-                send_json(data_json_by_command,IP=ip_logstash,PORT=port_logstash)
-                #print_json(data_json_by_command)
-            return {'status':'success'}
-     
-    return {'status':'error'}
+def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={}):
+    data_json = {}
+    start_time = time.time()
+    data_json = ssh_execute_by_command(command, ip , port , user , passw,typeDevice='forti', logstash={})
+    enlapsed_time = time.time() - start_time
+    status_general = data_json['status']
+    del data_json['status']
+    data_aditional = {
+        "devip" : ip,
+        'rename_index':'heartbeat',
+        "enlapsed_time": "{0:4f}".format(enlapsed_time),
+        'old_time' : (start_time)
+        #'datetime' : "{0}".format(datetime.utcnow().isoformat())
+    }
+    for name_proccess in list(data_json):
+        data_json_by_command = {}
+        data_json_by_command = { name_proccess : data_json[name_proccess]}
+        data_json_by_command.update( data_aditional )
+        #print_json(data_json_by_command)
+        try:
+            flag_send = logstash["send"]
+            if(flag_send):
+                ip_logstah = logstash['ip']
+                port_logstash = logstash['port']
+                send_json(data_json_by_command, IP=ip_logstah, PORT=port_logstash)
+        except:
+            pass
+    data_json.update(data_aditional)
+    data_json.update({'status': status_general})
+    return data_json
 ###############################################################################
 def get_parametersCMD():
     ip_logstash = port_logstash = typeDevice = None
@@ -470,7 +523,13 @@ def get_parametersCMD():
         print("ip_out\t= ["+str(ip_logstash)+"]\npp_out\t= ["+str(port_logstash)+"]")
         sys.exit(0)
     
-    get_data_firewall_ssh(command, ip, port, user, passw, ip_logstash=ip_logstash, port_logstash=port_logstash)
+    logstash = {
+        "send": True,
+        "ip": ip_logstash,
+        "port": port_logstash
+    }
+
+    get_data_firewall_ssh(command, ip, port, user, passw, logstash=logstash)
     return
 ###############################################################################
 if __name__=="__main__":
