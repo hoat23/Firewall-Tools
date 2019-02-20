@@ -7,8 +7,9 @@
 #https://cpiekarski.com/2011/05/09/super-easy-python-json-client-server/
 #http://46.101.4.154/Art�culos%20t�cnicos/Python/Paramiko%20-%20Conexiones%20SSH%$
 #
-import sys, json, socket, argparse, datetime, time
+import sys, json, socket, argparse, time
 import paramiko as pmk
+import datetime
 from utils import send_json, list2json, print_json
 ###############################################################################
 def get_lista(lineTxt,char_split=" "):
@@ -322,8 +323,7 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
             #print("[INFO] : ssh_conect() {0}@{1} SSH transport is not ready.".format(USER,IP))
             continue
         except:
-            #print("{3} [ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.utcnow().isoformat()))
-            print("[ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0]))
+            print("{3} [ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.datetime.utcnow().isoformat()))
             return ""
         cont_intent = cont_intent + 1
         time.sleep(retry_interval)
@@ -398,8 +398,8 @@ def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm'):
 def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     lista_json = {
         '@message' : 'python test message logtash',
-        '@tags' : ['python', 'test']
-        #'datetime': "{0}".format(datetime.utcnow().isoformat())
+        '@tags' : ['python', 'test'],
+        'datetime': "{0}".format(datetime.datetime.utcnow().isoformat())
     }
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
@@ -469,8 +469,8 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
         "devip" : ip,
         'rename_index':'heartbeat',
         "enlapsed_time": "{0:4f}".format(enlapsed_time),
-        'old_time' : (start_time)
-        #'datetime' : "{0}".format(datetime.utcnow().isoformat())
+        'old_time' : (start_time),
+        'datetime' : "{0}".format(datetime.datetime.utcnow().isoformat())
     }
     for name_proccess in list(data_json):
         data_json_by_command = {}
@@ -490,6 +490,7 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
     return data_json
 ###############################################################################
 def get_parametersCMD():
+    ip = port = user = passw = command = None
     ip_logstash = port_logstash = typeDevice = None
     parser = argparse.ArgumentParser()
 
