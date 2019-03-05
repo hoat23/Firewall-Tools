@@ -21,10 +21,12 @@ import argparse
 def execute_process(ip, port, logstash, return_dict, community, command, num_int=4):
     #command = "check_process,sysinfo_shm,sysinfo_memory,sysinfo_conserve,bandwidth"
     old_time = return_dict[ip]['old_time']
+    cont = return_dict[ip]['cont'] + 1       
+
     intent = 1
     while (intent <= num_int):
         res={'status': "error"} #Evitar error por timeout
-        res = get_data_firewall_snmp(ip, community, port=port, sample_time = 15.0, old_time=old_time, data_to_monitoring=command, logstash=logstash)#interfaces
+        res = get_data_firewall_snmp(ip, community, port=port, sample_time = 15.0, old_time=old_time, data_to_monitoring=command, logstash=logstash, cont = cont)#interfaces
         if res['status']!="error" :
             break   
         #sleep(1)
@@ -39,7 +41,8 @@ def execute_process(ip, port, logstash, return_dict, community, command, num_int
         enlapsed_time = res['enlapsed_time']
     else:
         enlapsed_time = -1
-    
+
+
     if(res['status']=="error" and intent>=num_int):
         sleep(5)
     
@@ -48,7 +51,8 @@ def execute_process(ip, port, logstash, return_dict, community, command, num_int
             'status': res['status'], 
             'old_time': old_time, 
             'num_int': intent,
-            'enlapsed_time': enlapsed_time
+            'enlapsed_time': enlapsed_time,
+            'cont' : cont
             }
         }
 
@@ -95,7 +99,8 @@ def init_multiprocessing(list_client, dict_client_ip, logstash, community, comma
                     'status': 'lauched',
                     'num_int': -1,
                     'old_time': 0,
-                    'enlapsed_time': -1
+                    'enlapsed_time': -1,
+                    'cont': -1
                     }
                 }
             return_dict.update( data_json )
@@ -154,7 +159,7 @@ def get_parametersCMD_multiprocessing(list_client_to_execute):
         "ip" : ip_logstash,
         "port" : port_logstash
     }
-    #python multiprocess_monitor_firewall_snmp.py -m prueba -c "bandwidth" -ip_out 54.208.72.130 -pp_out 5959 -dog False
+    #python multiprocess_monitor_firewall_snmp.py -m prueba -c "bandwidth" -ip_out 8.8.8.8 -pp_out 5959 -dog False
     if command=="build_dict":
         dict_ip_label = build_yml_label_interfaces(list_client_to_execute, dict_client_ip,community=community, dict_ip_label={})
     else:
@@ -164,9 +169,8 @@ def get_parametersCMD_multiprocessing(list_client_to_execute):
 if __name__ == "__main__":
     print("--> [START] multiprocess_snmp.py")
     community = "prueba"
-    list_client_to_execute=["alianza"]
-    #elk = elasticsearch()
-    #list_client_to_execute=["alianza","aje","alexim","babyclubchic","bdo","brexia","crp","ohsjdd","comexa","continental","cosapi","cpal","disal","dispercol","divemotors","egemsa","enapu","famesa","fibertel","filasur","gomelst","happyland","imm","ind_marique","ifreserve","la_llave","lab_hofarm","labocer","mastercol","movilmax","proinversion","san_silvestre","santo_domingo","socios_en_salud","supra","thomas_greg","trofeos_castro","univ_per_union","zinsa","upch","tasa","prompe","engie","cdtel"]
+    #list_client_to_execute = ["client_01","cliente_02"]
+    #dict_client_ip = { "client_01": [{"ip":"1.1.1.1", "port": {"ssh":22222,"http":9344,"snmp":161}}] }
     #init_multiprocessing(list_client_to_execute, dict_client_ip, logstash, community)
     get_parametersCMD_multiprocessing(list_client_to_execute)
 #########################################################################################

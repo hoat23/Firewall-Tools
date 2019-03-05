@@ -8,8 +8,9 @@
 #########################################################################################
 from pysnmp.hlapi import *
 from pysnmp.entity.rfc3413.oneliner import cmdgen
-import datetime, time, os, threading, queue, argparse
-from utils import *
+import time, os, threading, queue, argparse
+from datetime import datetime
+from utils import send_json, print_json, print_list, save_yml
 from dictionary import *
 #########################################################################################
 cmdGen = cmdgen.CommandGenerator()
@@ -289,7 +290,10 @@ def monitor_bandwidth(host, community, port=161):
                 value = d_json['list_value']
                 partial_json = {}
                 for i in range(0,num_ports):
-                    partial_json.update( { "{0}".format( field[i] ) : value[i] } )
+                    try:
+                        partial_json.update( { "{0}".format( field[i] ) : int(value[i]) } )
+                    except:
+                        print("[ERROR] monitor_bandwidth - Convert  value to int ({0})".format(value[i]))
                 data_json.update( {list_aux_oid[cont] : partial_json} )
                 cont = cont +1
         if len(data_json)<=0 :
@@ -298,7 +302,7 @@ def monitor_bandwidth(host, community, port=161):
             data_json.update({'status':'success'})
         #print_json(data_json)
         return data_json
-        """
+        """ # Por si algun día necesite modificar el formato de envio de la data
         data_in = list_response[0]
         data_out = list_response[1]
         #print_json(data_in)
@@ -349,7 +353,7 @@ def build_yml_label_interfaces(list_client_to_execute, dict_client_ip, community
         print("{0} [WARN ] build_yml_label_interfaces file don't create.".format( datetime.utcnow().isoformat()) )
     return dict_ip_label
 #########################################################################################
-def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_time=0, data_to_monitoring="sys_info,bandwidth,cpu_mem", logstash={}):
+def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_time=0, data_to_monitoring="sys_info,bandwidth,cpu_mem", logstash={}, cont=-2):
     start_time = time.time()
     list_monitoring = data_to_monitoring.split(",")
     data_json = {"status" : "error"}
@@ -388,7 +392,8 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
             "enlapsed_time" : "{0:4f}".format(enlapsed_time),
             "old_time" : (start_time), #old_time = start_time
             'datetime': "{0}".format(datetime.utcnow()),
-            "status" : "error"
+            "status" : "error",
+            "cont" : cont
         }
         print("{0} [ERROR] get_data_firewall_snmp({1}) timeout - elapsed_time:{2:2f}".format( datetime.utcnow().isoformat() , host, enlapsed_time))
     else:
@@ -399,7 +404,8 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
             "enlapsed_time" : "{0:4f}".format(enlapsed_time),
             "old_time" : (start_time), #old_time = start_time
             'datetime': "{0}".format(datetime.utcnow()),
-            "status": "success"
+            "status": "success",
+            "cont" : cont
         }
         data_json.update(data_aditional)
 
@@ -466,13 +472,9 @@ if __name__ == "__main__":
     get_parametersCMD()
     """
     # Configuration of device
-    host = '190.116.76.4'
+    host = '1.1.1.1'
     community = 'prueba'
-    logstash = {
-        "send":False,
-        "ip": "8.8.8.8",
-        "port": 5959
-        }
+    logstash = {"send":False,"ip": "8.8.8.8","port": 5959}
     data_json = get_data_firewall_snmp(host, community, port=161,data_to_monitoring="bandwidth",logstash=logstash) #cpu_mem
     print_json(data_json)
     """
