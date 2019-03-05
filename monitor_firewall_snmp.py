@@ -8,9 +8,9 @@
 #########################################################################################
 from pysnmp.hlapi import *
 from pysnmp.entity.rfc3413.oneliner import cmdgen
-import time, os, threading, queue, argparse
+import time, os, threading, queue, argparse, sys
 from datetime import datetime
-from utils import send_json, print_json, print_list, save_yml
+from utils import send_json, print_json, print_list, save_yml, loadYMLtoJSON, build_table_json
 from dictionary import *
 #########################################################################################
 cmdGen = cmdgen.CommandGenerator()
@@ -210,7 +210,7 @@ def decoded_value(oid,value_to_decoded):
         else:
             value_decoded = value_to_decoded
     except:
-        print("[ERROR]  decoded_value : oid [{0}] | key [{0}] not found in dict.".format(oid, value_to_decoded))
+        print("[ERROR]  decoded_value : oid [{0}] | key [{1}] not found in dict.".format(oid, value_to_decoded))
         value_decoded = value_to_decoded
     finally:
         return value_decoded
@@ -302,7 +302,8 @@ def monitor_bandwidth(host, community, port=161):
             data_json.update({'status':'success'})
         #print_json(data_json)
         return data_json
-        """ # Por si algun día necesite modificar el formato de envio de la data
+        """
+        # Por si algun día necesite modificar el formato de envio de la data
         data_in = list_response[0]
         data_out = list_response[1]
         #print_json(data_in)
@@ -318,9 +319,10 @@ def monitor_bandwidth(host, community, port=161):
                 'status':'error'
             }
             print( "{0} [ERROR] monitor_bandwidth {1} length(in/out)=>0 ".format(datetime.utcnow().isoformat(), host) )
-        #print_json(data_json)
-        return data_json
+        print_json(data_json)
         """
+        return data_json
+        
     else:
         print( "{0} [ERROR] monitor_bandwidth {1}".format(datetime.utcnow().isoformat(), host) )
         return {'status' : 'error'}
@@ -353,6 +355,24 @@ def build_yml_label_interfaces(list_client_to_execute, dict_client_ip, community
         print("{0} [WARN ] build_yml_label_interfaces file don't create.".format( datetime.utcnow().isoformat()) )
     return dict_ip_label
 #########################################################################################
+def add_label_to_bandwidth(data_json, host,path_of_multi_dict='label_interfaces.yml'):
+    #print_json(data_json)
+    dict_yml = loadYMLtoJSON(path_of_multi_dict)
+    dict_interfaces = dict_yml[host] #Cargamos el dicionario para el host especificado
+    list_data_json = [dict_interfaces]
+    list_keys = ['interface','in','out']
+    for key  in list_keys:
+        if key in data_json:
+            d_json = data_json[key]
+            list_data_json.append(d_json)
+    #print_json(list_data_json)
+    table_json =  build_table_json(list_keys, list_data_json)
+    new_data_json = {
+        "table" : table_json,
+        "status" : data_json['status']
+    }
+    return new_data_json
+#########################################################################################
 def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_time=0, data_to_monitoring="sys_info,bandwidth,cpu_mem", logstash={}, cont=-2):
     start_time = time.time()
     list_monitoring = data_to_monitoring.split(",")
@@ -366,6 +386,8 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
                 print("{0} [ERROR] get_data_firewall_snmp({1}) -> {2}".format( datetime.utcnow().isoformat(), host, index))
         if index == "bandwidth":
             data_json_bandwidth = monitor_bandwidth(host, community, port=port)
+            #Se modifico a una tabla tipo json para facilitar la creacion de graficas en Vega
+            data_json_bandwidth = add_label_to_bandwidth(data_json_bandwidth,host)
             if len(data_json_bandwidth)>0 :
                 data_json.update( {index: data_json_bandwidth} )
             else:
@@ -423,7 +445,7 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
         if(flag_send):
             ip_logstah = logstash["ip"]
             port_logstash = logstash["port"]
-            send_json(data_json, IP=ip_logstah, PORT=port_logstash, emulate=(not flag_send), dictionary={"path_of_multi_dict":"label_interfaces.yml", "dict_to_load": host})# dictionary={"multi_dict" : dict_ip_label, "dict_to_load": host})
+            send_json(data_json, IP=ip_logstah, PORT=port_logstash, emulate=(not flag_send) )#, dictionary={"path_of_multi_dict":"label_interfaces.yml", "dict_to_load": host})# dictionary={"multi_dict" : dict_ip_label, "dict_to_load": host})
     except:
         pass
     #print_json(data_json)
