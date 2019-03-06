@@ -169,8 +169,8 @@ def get_parametersCMD_multiprocessing(list_client_to_execute):
 if __name__ == "__main__":
     print("--> [START] multiprocess_snmp.py")
     community = "prueba"
-    #list_client_to_execute = ["client_01","cliente_02"]
+    #list_client_to_execute_snmp = ["client_01","cliente_02"]
     #dict_client_ip = { "client_01": [{"ip":"1.1.1.1", "port": {"ssh":22222,"http":9344,"snmp":161}}] }
-    #init_multiprocessing(list_client_to_execute, dict_client_ip, logstash, community)
-    get_parametersCMD_multiprocessing(list_client_to_execute)
+    #init_multiprocessing(list_client_to_execute_snmp, dict_client_ip, logstash, community)
+    get_parametersCMD_multiprocessing(list_client_to_execute_snmp)
 #########################################################################################
