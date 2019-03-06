@@ -1,6 +1,5 @@
 # Firewall-Tools
 
-## Programas Python:
 La extracción de datos adicionales de los firewalls se clasifican según el protocolo utilizado:
 #### Protocolo SNMP
 + monitor_firewall_snmp.py
