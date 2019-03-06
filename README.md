@@ -22,4 +22,4 @@ La extracción de datos adicionales de los firewalls se clasifican según el pro
 #### Protocol HTTP
 + fortiOS_API.py: Aplicación que permite interactuar con el firewall a nivel de API, puedes configurar, cargar configuraciones, setear protocolos, etc.
   + Modificación adicional para descarga de backups **“/api/v2/monitor/system/config/backup?scope=global”**.
-+ check_cpu_mem.py
++ multiprocess_monitor_firewall_http.py
