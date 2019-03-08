@@ -20,7 +20,7 @@ import pprint
 import sys, requests, json
 from datetime import datetime, timedelta
 from time import time
-from utils import *
+from utils import send_json, list2json
 ###############################################################################################################
 def req_get(URL_API,data="",timeout=None):
     rpt = requests.get( url=URL_API , timeout=timeout)
@@ -32,6 +32,7 @@ def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
     #data_txt = data_txt.replace("\"","")
     data_txt = data_txt.replace("\r","")
     list_lines = data_txt.split('\n')
+    data_json = {}
     for line in list_lines:
         if len(line):
             if (line[0]=='#' or line[0]==' '):
@@ -46,9 +47,11 @@ def convert_data(data_txt,list_field=None,aditional_data={},split_char=','):
                     aditional_data.update({"source_id":num})
                     line_json.update(aditional_data)
                     send_json(line_json,IP="127.0.0.0",PORT=5959)
+                    data_json.update(line_json)
                     #print_json(line_json)
                     #time.sleep(0.200)
             #print("{0:03d}. {1}".format(num,line))
+    return data_json
 ###############################################################################################################
 if __name__ == "__main__":
     #Fuentes de IOC
