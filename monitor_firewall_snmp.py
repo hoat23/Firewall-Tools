@@ -413,7 +413,7 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
             "rename_index" : "snmp",
             "enlapsed_time" : "{0:4f}".format(enlapsed_time),
             "old_time" : (start_time), #old_time = start_time
-            'datetime': "{0}".format(datetime.utcnow()),
+            'datetime': "{0}".format(datetime.utcnow().isoformat()),
             "status" : "error",
             "cont" : cont
         }
@@ -425,7 +425,7 @@ def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_ti
             "rename_index" : "snmp",
             "enlapsed_time" : "{0:4f}".format(enlapsed_time),
             "old_time" : (start_time), #old_time = start_time
-            'datetime': "{0}".format(datetime.utcnow()),
+            'datetime': "{0}".format(datetime.utcnow().isoformat()),
             "status": "success",
             "cont" : cont
         }
