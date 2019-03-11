@@ -10,7 +10,7 @@ from pysnmp.hlapi import *
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 import time, os, threading, queue, argparse, sys
 from datetime import datetime
-from utils import send_json, print_json, print_list, save_yml, loadYMLtoJSON, build_table_json
+from utils import send_json, print_json, print_list, save_yml, loadYMLtoJSON, build_table_json, string2hex
 from dictionary import *
 #########################################################################################
 cmdGen = cmdgen.CommandGenerator()
