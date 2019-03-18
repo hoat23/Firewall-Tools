@@ -358,20 +358,24 @@ def build_yml_label_interfaces(list_client_to_execute, dict_client_ip, community
 def add_label_to_bandwidth(data_json, host,path_of_multi_dict='label_interfaces.yml'):
     #print_json(data_json)
     dict_yml = loadYMLtoJSON(path_of_multi_dict)
-    dict_interfaces = dict_yml[host] #Cargamos el dicionario para el host especificado
-    list_data_json = [dict_interfaces]
-    list_keys = ['interface','in','out']
-    for key  in list_keys:
-        if key in data_json:
-            d_json = data_json[key]
-            list_data_json.append(d_json)
-    #print_json(list_data_json)
-    table_json =  build_table_json(list_keys, list_data_json)
-    new_data_json = {
-        "table" : table_json,
-        "status" : data_json['status']
-    }
-    return new_data_json
+    if host in dict_yml:
+        dict_interfaces = dict_yml[host] #Cargamos el dicionario para el host especificado
+        list_data_json = [dict_interfaces]
+        list_keys = ['interface','in','out']
+        for key  in list_keys:
+            if key in data_json:
+                d_json = data_json[key]
+                list_data_json.append(d_json)
+        #print_json(list_data_json)
+        table_json =  build_table_json(list_keys, list_data_json)
+        new_data_json = {
+            "table" : table_json,
+            "status" : data_json['status']
+        }
+        return new_data_json
+    else:
+        print("[ERROR] add_label_to_bandwidth {0} not found in dict_yml".format(host))
+        return data_json
 #########################################################################################
 def get_data_firewall_snmp(host, community, port=161, sample_time = 15.0, old_time=0, data_to_monitoring="sys_info,bandwidth,cpu_mem", logstash={}, cont=-2):
     start_time = time.time()
