@@ -332,6 +332,8 @@ def testmain():
     fgt.logout()
 ###############################################################################
 def receive_parameters_from_bash():
+    ip = port = user = passw = None
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("-i","--ip",help="ip of host")
     parser.add_argument("-pp","--port",help="Port of host")
