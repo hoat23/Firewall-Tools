@@ -1,46 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8 
 # Developer: Deiner Zapata Silva.
-# Date: 31/12/2018
+# Date: 19/11/2018
 # Description: Server to conect to FireWall using API
 # Code Base: https://github.com/sheltont/fortiapi/blob/master/fgt.py
 #########################################################################################
-import logging,sys,time
+import logging,sys,time,os
 from pprint import pprint
 import requests
-import sys, json, socket, argparse
+import sys, json, socket, argparse, datetime
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-###############################################################################
-def send_json(msg, IP="0.0.0.0", PORT = 2233):
-    """
-        #Configuracion en /etc/logstash/conf.d/logstash-syslog.conf
-        input{
-            tcp{
-                port => [PORT_NUMBER]
-                codec => json
-            }
-        }
-    """
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect( (IP,PORT) )
-        #print "sending message: "+str(msg)
-        datajs = json.dumps(msg)
-        sock.sendall( datajs.encode() )
-    except:
-        print("Error inesperado: "+sys.exc_info()[0])
-        #sys.exit(1)
-        return
-    finally:
-        sock.close()
-        return
-###############################################################################
-def fileTXT_save(text, nameFile = "backupForti.txt"):
-    fnew  = open(nameFile,"wb")
-    fnew.write(text.encode('utf-8')) # str(aux=[line])+'\n'
-    fnew.close() 
-    return
+from subprocess import Popen, PIPE
+from utils import *
 ###############################################################################
 class AuthenticationError(Exception):
     def __init__(self, value):
@@ -69,7 +41,7 @@ class FGT(object):
     Script will start a session by login into the FGT
     All subsequent calls will use the session's cookies and CSRF token
     """
-    def __init__(self, url_prefix, vdom, verbose=False):#H23
+    def __init__(self, url_prefix, vdom, verbose=False):#H23 Verbose: True <- Only by debug (Not in production)
         self.url_prefix = url_prefix
         self.session = requests.session()  # use single session for all requests
         self.vdom = vdom
@@ -105,10 +77,11 @@ class FGT(object):
     def logout(self):
         url = self.url_prefix + '/logout'
         res = self.session.post(url)
+        return res
 
     def get(self, url_postfix, params=None, data=None, verbose=True, get_text=False):
         url = self.url_prefix + url_postfix
-        res = self.session.get(url, params=self.append_vdom_params(params), data=data)
+        res = self.session.get(url, params=self.append_vdom_params(params), data=data, timeout=10)
         self.update_csrf()  # update session's csrf
         return self.check_response(res, verbose, get_text)
 
@@ -269,21 +242,28 @@ class FGT(object):
                 return False
 ###############################################################################
 def testmain():
-    urlprefix = 'https://8.8.8.8:9443'
-    username = 'user'
-    password = 'pass'
+    #https://161.132.109.162:9443/api/v2/monitor/system/vdom-resource/select/
+    #161.132.109.162:9443
+    urlprefix = 'https://161.132.109.162:9443'
+    username = 'deyvis.supra' #fortisiem'
+    password = 'd3yv1s' #'5upporT@$1eM'
     vdom = 'root'
 
     fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
     fgt.login(username, password)
     
     #Download backup forti
-    res = fgt.get('/api/v2/monitor/system/config/backup?scope=global',get_text=True)
-    fileTXT_save(res, nameFile = "backupForti.conf")
+    #res = fgt.get('/api/v2/monitor/system/config/backup?scope=global',get_text=True)
+    #fileTXT_save(res, nameFile = "backupForti.conf")
 
-    #
-    res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://8.8.8.8:9443/api/v2/monitor/router/ipv4/select/
+    #Get CPU and Stadistics
+    res = fgt.get('/api/v2/monitor/system/global-resources/select/')
+    #res = fgt.get('/api/v2/monitor/system/vdom-resource/select/')
     pprint(res)
+
+    #Obtener las interfaces
+    #res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://161.132.109.162:9443/api/v2/monitor/router/ipv4/select/
+    #pprint(res)
 
     # Example of CMDB API requests
     #res = fgt.get('/api/v2/cmdb/system/interface')
@@ -352,7 +332,6 @@ def testmain():
     fgt.logout()
 ###############################################################################
 def receive_parameters_from_bash():
-    #global ip , port , user , passw , command , ip_logstash , port_logstash
     parser = argparse.ArgumentParser()
     parser.add_argument("-i","--ip",help="ip of host")
     parser.add_argument("-pp","--port",help="Port of host")
@@ -384,27 +363,36 @@ def receive_parameters_from_bash():
 
     vdom = 'root'
     urlprefix = 'https://' + str(ip) + ":" + str(port)
-    
-    fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
-    fgt.login(user, passw)
-    
-    #Download of backup
-    if(command=='/api/v2/monitor/system/config/backup?scope=global'):
-        res = fgt.get(command,get_text=True)
-        #fileTXT_save(res, nameFile = "backupForti.txt")
-        #Send backup file to logstash
-        send_json( {'url_api': command ,'backup_file':res, 'host': ip } , IP=ip_logstash, PORT=port_logstash)
-    else:
-        res = fgt.get(command) # /api/v2/monitor/router/ipv4/select/
-        #pprint(res)
-        #Send data to logstash
-        res.update({'url_api': command , "host": ip })
-        send_json( res , IP=ip_logstash, PORT=port_logstash)
-    fgt.logout()
 
+    if isAliveIP(str(ip)):
+        try:
+            fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
+            fgt.login(user, passw)
+
+            #Download of backup
+            if(command=='/api/v2/monitor/system/config/backup?scope=global'):
+                res = fgt.get(command,get_text=True)
+                fecha = datetime.datetime.now().strftime("%Y%m%d")
+                nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
+                #fileTXT_save(res, nameFile = nameFile)
+                #Send backup file to logstash
+                send_json( {'url_api': command ,'backup_file':res, 'host': ip } , IP=ip_logstash, PORT=port_logstash)
+            else:
+                res = fgt.get(command) # /api/v2/monitor/router/ipv4/select/
+                #pprint(res)
+                #Send data to logstash
+                res.update({'url_api': command , "host": ip })
+                send_json( res , IP=ip_logstash, PORT=port_logstash)
+        finally:
+            fgt.logout()
+    else:
+            print(" IP:"+str(ip)+" host is DOWN ")
+            #send_json( {"ip": ip, "status": "down"} , IP=ip_logstash, PORT=port_logstash)
+###############################################################################
 if __name__ == '__main__':
     #testmain()
     receive_parameters_from_bash()
+    
 """
 DATOS A DESCARGAR DEL FIREWALL
 firewall/session/select/ GET List all active firewall sessions (optionally filtered).
