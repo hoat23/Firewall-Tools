@@ -18,7 +18,7 @@ from dictionary import *
 from elastic import *
 import argparse
 #########################################################################################
-def execute_process(ip, port, logstash, return_dict, community, command, num_int=4):
+def execute_process(ip, port, logstash, return_dict, community, command, sample_time, num_int=4):
     #command = "check_process,sysinfo_shm,sysinfo_memory,sysinfo_conserve,bandwidth"
     old_time = return_dict[ip]['old_time']
     cont = return_dict[ip]['cont'] + 1       
@@ -26,7 +26,7 @@ def execute_process(ip, port, logstash, return_dict, community, command, num_int
     intent = 1
     while (intent <= num_int):
         res={'status': "error"} #Evitar error por timeout
-        res = get_data_firewall_snmp(ip, community, port=port, sample_time = 15.0, old_time=old_time, data_to_monitoring=command, logstash=logstash, cont = cont)#interfaces
+        res = get_data_firewall_snmp(ip, community, port=port, sample_time = sample_time, old_time=old_time, data_to_monitoring=command, logstash=logstash, cont = cont)#interfaces
         if res['status']!="error" :
             break   
         #sleep(1)
@@ -59,7 +59,7 @@ def execute_process(ip, port, logstash, return_dict, community, command, num_int
     return_dict.update( data_json )
     return
 #########################################################################################
-def launch_watchdog(list_process, dict_pid_ip, logstash, return_dict, community, command):
+def launch_watchdog(list_process, dict_pid_ip, logstash, return_dict, community, command, sample_time):
     while(True):
         cont = 0
         #os.system('cls')
@@ -71,8 +71,9 @@ def launch_watchdog(list_process, dict_pid_ip, logstash, return_dict, community,
             port = dict_pid_ip[p.pid]['port']
             client = dict_pid_ip[p.pid]['client']
             if(not p.is_alive()):
+                p.kill() #Killing process avoid overmemory.
                 del dict_pid_ip[p.pid]
-                p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_process,args=(ip, port, logstash, return_dict, community, command))
+                p = mp.Process(name="{0}_{1}:{2}".format(client,ip,port),target=execute_process,args=(ip, port, logstash, return_dict, community, command, sample_time))
                 p.daemon=True
                 p.start()
                 dict_pid_ip.update({ p.pid: {"ip":ip, "port":port, "client":client} })
@@ -82,7 +83,7 @@ def launch_watchdog(list_process, dict_pid_ip, logstash, return_dict, community,
             cont = cont +1
     return
 #########################################################################################
-def init_multiprocessing(list_client, dict_client_ip, logstash, community, command="bandwidth", enabled_watchdog=True):
+def init_multiprocessing(list_client, dict_client_ip, logstash, community, command="bandwidth", sample_time=15.0, enabled_watchdog=True):
     list_process_running = []
     manager = mp.Manager()
     return_dict = manager.dict()
@@ -105,14 +106,14 @@ def init_multiprocessing(list_client, dict_client_ip, logstash, community, comma
                 }
             return_dict.update( data_json )
             # Init by process by IP:PORT
-            p = mp.Process(name=client+"_"+ip+":"+str(port),target=execute_process,args=(ip, port, logstash, return_dict, community, command))
+            p = mp.Process(name="{0}_{1}:{2}".format(client,ip,port),target=execute_process,args=(ip, port, logstash, return_dict, community, command, sample_time))
             p.daemon = True
             p.start()
             dict_pid_ip.update({ p.pid: {"ip":ip, "port":port, "client":client} })
             list_process_running.append(p)
     print("--> [  END] process are launched.")
     if (enabled_watchdog):
-        launch_watchdog(list_process_running, dict_pid_ip, logstash, return_dict, community, command)
+        launch_watchdog(list_process_running, dict_pid_ip, logstash, return_dict, community, command, sample_time)
     else:
         for p in list_process_running:
             p.join()
@@ -168,7 +169,6 @@ def get_parametersCMD_multiprocessing(list_client_to_execute):
 #########################################################################################
 if __name__ == "__main__":
     print("--> [START] multiprocess_snmp.py")
-    community = "prueba"
     #list_client_to_execute_snmp = ["client_01","cliente_02"]
     #dict_client_ip = { "client_01": [{"ip":"1.1.1.1", "port": {"ssh":22222,"http":9344,"snmp":161}}] }
     #init_multiprocessing(list_client_to_execute_snmp, dict_client_ip, logstash, community)
