@@ -7,7 +7,7 @@
 #https://cpiekarski.com/2011/05/09/super-easy-python-json-client-server/
 #http://46.101.4.154/Art�culos%20t�cnicos/Python/Paramiko%20-%20Conexiones%20SSH%$
 #
-import sys, json, socket, argparse, time
+import sys, json, socket, argparse, time, os
 import paramiko as pmk
 import datetime
 from utils import send_json, list2json, print_json
@@ -314,8 +314,8 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
             return ssh
         except pmk.ssh_exception.SSHException as e:
             #Socket is open, but not SSH service responded
-            if e.message == 'Error reading SSH protocol banner':
-                print(e)
+            if e:
+                print(str(e))
                 continue
             #print("[INFO] : ssh_conect() {0}@{1} SSH transport is available!.")
             break
@@ -454,7 +454,7 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
     rpt_ping="DOWN"
-    rpt = os.sytem("ping "+ip)#os.system("ping -c 1"+ip)#Superuser
+    rpt = os.sytem("ping :"+IP)#os.system("ping -c 1"+ip)#Superuser
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
@@ -467,7 +467,7 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
     del data_json['status']
     data_aditional = {
         "devip" : ip,
-        'rename_index':'heartbeat',
+        'rename_index':'health',
         "enlapsed_time": "{0:4f}".format(enlapsed_time),
         'old_time' : (start_time),
         'datetime' : "{0}".format(datetime.datetime.utcnow().isoformat())
@@ -516,7 +516,7 @@ def get_parametersCMD():
     
     if( ip==None or port==None or user==None or command==None):
         print("\nERROR: Faltan parametros.")
-        print("ip\t= ["+str(ip)+"] \nport\t= ["+str(port)+"] \nuser\t= ["+str(user)+"] \n"+"passw\t= ["+str(passw)+"]")
+        print("ip\t= ["+str(ip)+"] \nport\t= ["+str(port)+"] \t= ["+str(user)+"] \n"+"passw\t= ["+str(passw)+"]")
         sys.exit(0)
     
     if( ip_logstash==None or port_logstash==None):
