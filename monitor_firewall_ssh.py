@@ -407,7 +407,7 @@ def ssh_get_sysinfo_conserve(ssh_obj, command='diagnose hardware sysinfo conserv
     
     data_json = conserve_sysinfo_to_list_json(outtxt.decode('utf-8'))
     data_json.update({'command' : command})
-    print_json(data_json)
+    #print_json(data_json)
     return data_json
 ###############################################################################
 def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):# solo soport global
