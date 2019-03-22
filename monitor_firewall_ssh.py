@@ -10,7 +10,7 @@
 import sys, json, socket, argparse, time, os
 import paramiko as pmk
 import datetime
-from utils import send_json, list2json, print_json
+from utils import send_json, list2json, print_json, print_list
 ###############################################################################
 def get_lista(lineTxt,char_split=" "):
     Lista = lineTxt.split(char_split)
@@ -107,6 +107,7 @@ def fileTXT_save(text, nameFile = "FortiConfBackup23.txt", typeProcess=None):
 ###############################################################################
 def process_header(lista):
     lista_json = {}
+    
     for i in range(0,len(lista)):
         val = lista[i]
         val = val.replace(",","")
@@ -260,6 +261,7 @@ def shm_table_to_json(simple_lista):
     return data_json
 ###############################################################################
 def process_table_to_json(simple_lista):
+    #print(simple_lista)#H23
     simple_lista = simple_lista.replace(" <","<")
     simple_lista = simple_lista.replace(" N","N")
     list_lines = simple_lista.split('\n')
@@ -287,9 +289,12 @@ def process_table_to_json(simple_lista):
     return data_json
 ###############################################################################
 def sys_status_to_json(simple_lista):
+    simple_lista = simple_lista.replace("--More-- \r","")
+    simple_lista = simple_lista.replace("         \r","")
     michi = simple_lista.find("#")
     simple_lista = simple_lista[michi+2:]
     list_lines = simple_lista.split('\n')
+    
     data_json = {}
     for line in list_lines:
         pos = line.find(':')
@@ -298,9 +303,10 @@ def sys_status_to_json(simple_lista):
             value = line[pos+2:len(line)]
             #print(" ->" + field+ ":"+value)
             data_json.update( {field:value} )
+    
     return data_json
 ###############################################################################
-def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retry_interval=100, num_intent=3):
+def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retry_interval=1, num_intent=10):
     #https://netdevops.me/2017/waiting-for-ssh-service-to-be-ready-with-paramiko/
     ssh = pmk.SSHClient()
     ssh.set_missing_host_key_policy(pmk.AutoAddPolicy())
@@ -309,7 +315,7 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
     while (time.time() < timeout_start+timeout) and (cont_intent < num_intent):
         try:
             ssh_stdin = ssh_stdout = ssh_sterr = None
-            ssh.connect(IP , port=PORT ,username=USER , password=PASS,look_for_keys=False,allow_agent=False)
+            ssh.connect(IP , port=PORT ,username=USER , password=PASS,look_for_keys=False,allow_agent=False)#timeout=1
             #print("[INFO] : ssh_connect() -> Conected {0}@{1}".format(USER,IP))
             return ssh
         except pmk.ssh_exception.SSHException as e:
@@ -325,18 +331,22 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
         except:
             print("{3} [ERROR] : ssh_connect() {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.datetime.utcnow().isoformat()))
             return ""
-        cont_intent = cont_intent + 1
-        time.sleep(retry_interval)
+        finally:
+            print("{2} [WARN ] : ssh_connect() Trying to connect {0}@{1}".format(USER,IP, datetime.datetime.utcnow().isoformat()))
+            cont_intent = cont_intent + 1
+            time.sleep(retry_interval)
+    return ""
 ###############################################################################
-def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233):
+def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233, obj_extern = False):
     ssh_stdin = ssh_stdout = ssh_sterr = None
-    obj_extern = False
+    
     try:
         if(ssh_obj==None):
             ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
             obj_extern = True
         in_, out_, error = ssh_obj.exec_command(command)
         if(obj_extern):
+            print("[INFO] ssh_exec_command - close conection.")
             ssh_obj.close()
         #print(str(error.read()))
         output_txt = out_.read()
@@ -365,34 +375,73 @@ def ssh_download_config(ssh_obj, device="forti"):
     data_json.update({'backup_file':outtxt})
     return data_json
 ###############################################################################
-def ssh_get_sys_status(ssh_obj, command='get system status'):
+def ssh_get_sys_status(ssh_obj, command='get system status'):# No necesita especificar vdom es igual en todos los ambientes
     outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
     data_json = sys_status_to_json(outtxt.decode('utf-8'))
     data_json.update({'command' : command})
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm'):
-    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
-    data_json = shm_table_to_json(outtxt.decode('utf-8'))
-    data_json.update({'command' : command})
+def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm',vdom=None):
+    if(vdom!=None):
+        if vdom=="global":
+            command_vdom = "config global\n{0}".format(command)
+        else:
+            command_vdom = "config vdom\n edit {0}\n {1}\n".format(vdom,command)
+        outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)
+    else:
+        outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        print("[ERROR] ssh_get_sysinfo_shm : Command fail. Maybe you need add 'vdom'.")
+        data_json={}
+    else:
+        data_json = shm_table_to_json(outtxt.decode('utf-8'))
+        data_json.update({'command' : command})
+    
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_conserve(ssh_obj, command='diagnose hardware sysinfo conserve'):
+def ssh_get_sysinfo_conserve(ssh_obj, command='diagnose hardware sysinfo conserve'):# solo soporta global
+
     outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        outtxt,errortxt = ssh_exec_command("config global\n{0}\n".format(command),ssh_obj=ssh_obj)
+    
     data_json = conserve_sysinfo_to_list_json(outtxt.decode('utf-8'))
     data_json.update({'command' : command})
+    print_json(data_json)
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
+def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):# solo soport global
+    
     outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
-    data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
-    data_json.update({'command' : command})
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        outtxt,errortxt = ssh_exec_command("config global\n{0}\n".format(command),ssh_obj=ssh_obj)
+    
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        print("[ERROR] ssh_get_process_runing : Command fail. Maybe you need add 'vdom'.")
+        data_json= {}
+    else:
+        data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
+        data_json.update({'command' : command})
+    print_json(data_json)
+    sys.exit(0)
     return data_json
 ###############################################################################
-def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm'):
-    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
-    data_json = process_table_to_json(errortxt.decode('utf-8'))
-    data_json.update({'command' : command})
+def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm',vdom=None): # UTM_FG , root
+    if(vdom!=None):
+        if vdom=="global":
+            command_vdom = "config global\n{0}\n".format(command)
+        else:
+            command_vdom = "config vdom\n edit {0}\n {1}\n".format(vdom,command)
+        outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+    else:
+        outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        print("[ERROR] ssh_get_process_runing : Command fail. Maybe you need add 'vdom'.")
+        data_json= {}
+    else:
+        data_json = process_table_to_json(errortxt.decode('utf-8'))
+        data_json.update({'command' : command})
     return data_json
 ###############################################################################
 def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
@@ -404,9 +453,8 @@ def test_logstash_conection(IP_LOGSTASH="0.0.0.0", PORT_LOGSTASH=2233):
     send_json(lista_json, IP=IP_LOGSTASH, PORT = PORT_LOGSTASH)
     return
 ###############################################################################
-def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='forti', logstash={}):
+def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='forti', logstash={}, vdom=None):#Vdom puede ser una lista o solo un parametro
     ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
-    
     data_json = {}
     flag_error = False
     if ssh_obj=="" or ssh_obj==None :
@@ -417,14 +465,16 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
         for command in list_command:
             if (command=="sys_status"):
                 rpt_json = ssh_get_sys_status(ssh_obj)
-            if (command=="sysinfo_shm"):
-                rpt_json = ssh_get_sysinfo_shm(ssh_obj)
             if (command=="sysinfo_conserve"):
-                rpt_json = ssh_get_sysinfo_conserve(ssh_obj)
+                rpt_json = ssh_get_sysinfo_conserve(ssh_obj)#Si da error accede a la configuración global -> solo acepta global
             if (command=="sysinfo_memory"):
-                rpt_json = ssh_get_sysinfo_memory(ssh_obj)
+                rpt_json = ssh_get_sysinfo_memory(ssh_obj)#Si da error accede a la configuración global -> solo acepta global
+            #----------COMANNDOS VDOM--------------------------------------------------------------------------
+            if (command=="sysinfo_shm"):
+                rpt_json = ssh_get_sysinfo_shm(ssh_obj,vdom=vdom)
             if(command=="check_process"):
-                rpt_json = ssh_get_process_runing(ssh_obj)
+                rpt_json = ssh_get_process_runing(ssh_obj,vdom=vdom)
+            #----------DEPRECADE------------------------------------------------------------------------------
             if(command=="down_config"):
                 rpt_json = ssh_download_config(ssh_obj,device=typeDevice)
             if(command=="test_logstash_conection"):
@@ -435,12 +485,15 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
                     rpt_json.update( {command : { 'status' : 'success'} })
                 except:
                     rpt_json.update( {command : { 'status' : 'error'} })
+            #----------DEPRECADE------------------------------------------------------------------------------
             if len(rpt_json)>0:
                 rpt_json.update( {'status' : 'success'} )
             else:
                 rpt_json.update( {'status' : 'error'} )
                 flag_error=True
             data_json.update( { command : rpt_json } )
+            if(vdom!=None):
+                data_json.update( { 'vdom' : vdom } )
             
         try: #H23 - mejorar el manejo de errores y parseo para multiprocesos
             ssh_obj.close()
@@ -458,10 +511,10 @@ def ping_test(IP="0.0.0.0"):
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
-def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={}):
+def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={}, vdom=None): #Para el caso de ser ejecutado por "multiprocess", la variable "vdom", debe ser una lista.
     data_json = {}
     start_time = time.time()
-    data_json = ssh_execute_by_command(command, ip , port , user , passw,typeDevice='forti', logstash={})
+    data_json = ssh_execute_by_command(command, ip , port , user , passw,typeDevice='forti', logstash={}, vdom=vdom)
     enlapsed_time = time.time() - start_time
     status_general = data_json['status']
     del data_json['status']
@@ -490,7 +543,7 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
     return data_json
 ###############################################################################
 def get_parametersCMD():
-    ip = port = user = passw = command = None
+    ip = port = user = passw = command = vdom = None
     ip_logstash = port_logstash = typeDevice = None
     parser = argparse.ArgumentParser()
 
@@ -502,7 +555,8 @@ def get_parametersCMD():
     parser.add_argument("-ip_out","--ip_out",help="IP del logstash")
     parser.add_argument("-pp_out","--pp_out",help="Puerto del logstash")
     parser.add_argument("-d","--device",help="Type of device [forti=default,paloalto]")
-
+    parser.add_argument("-vdom","--vdom",help="Especify the vdom where to execute command.")
+    
     args = parser.parse_args()
 
     if args.ip: ip = str(args.ip)
@@ -513,6 +567,7 @@ def get_parametersCMD():
     if args.ip_out: ip_logstash = str(args.ip_out)
     if args.pp_out: port_logstash = int(args.pp_out)
     if args.device: typeDevice = str(args.device)
+    if args.vdom: vdom = str(args.vdom)
     
     if( ip==None or port==None or user==None or command==None):
         print("\nERROR: Faltan parametros.")
@@ -530,7 +585,7 @@ def get_parametersCMD():
         "port": port_logstash
     }
 
-    get_data_firewall_ssh(command, ip, port, user, passw, logstash=logstash)
+    get_data_firewall_ssh(command, ip, port, user, passw, logstash=logstash, vdom=vdom)
     return
 ###############################################################################
 if __name__=="__main__":
