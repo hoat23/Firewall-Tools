@@ -422,8 +422,8 @@ def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
     else:
         data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
         data_json.update({'command' : command})
-    print_json(data_json)
-    sys.exit(0)
+    #H2print_json(data_json)
+    
     return data_json
 ###############################################################################
 def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm',vdom=None): # UTM_FG , root
