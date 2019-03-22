@@ -12,6 +12,17 @@ import paramiko as pmk
 import datetime
 from utils import send_json, list2json, print_json, print_list
 ###############################################################################
+def validate_result(data_to_validate_json,add_status_field=True,flag_error=False):
+    data_json = {}
+    data_json.update(data_to_validate_json)
+    if len(data_to_validate_json)>0:
+        data_json.update( {'status':'success'} )
+        flag_error = False or flag_error
+    else:
+        data_json.update( {'status':'error'}  )
+        flag_error = True or flag_error
+    return data_json,flag_error
+###############################################################################
 def get_lista(lineTxt,char_split=" "):
     Lista = lineTxt.split(char_split)
     levelAux = flagMore = flagOne = 0
@@ -255,7 +266,11 @@ def shm_table_to_json(simple_lista):
                 if(lista[0]=="conserve_mode" or lista[0]=="sys_last_entered" or lista[0]=="sys_fd_last_entered"):
                     data_json.update( { lista[0] : (lista[1]) } )
                 else:
-                    data_json.update( { lista[0] : int(lista[1]) } )
+                    try:
+                        data_json.update( { lista[0] : int(lista[1]) } )
+                    except:
+                        print("[ERROR] shm_table_to_json")
+                        print(simple_lista)
         cont = cont + 1
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
@@ -381,15 +396,11 @@ def ssh_get_sys_status(ssh_obj, command='get system status'):# No necesita espec
     data_json.update({'command' : command})
     return data_json
 ###############################################################################
-def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm',vdom=None):
-    if(vdom!=None):
-        if vdom=="global":
-            command_vdom = "config global\n{0}".format(command)
-        else:
-            command_vdom = "config vdom\n edit {0}\n {1}\n".format(vdom,command)
-        outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)
-    else:
-        outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
+def ssh_get_sysinfo_shm(ssh_obj, command='diagnose hardware sysinfo shm'):# solo soporta global
+    outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)
+    if errortxt.decode('utf-8').find("Command fail")>=0:
+        outtxt,errortxt = ssh_exec_command("config global\n{0}\n".format(command),ssh_obj=ssh_obj)
+    
     if errortxt.decode('utf-8').find("Command fail")>=0:
         print("[ERROR] ssh_get_sysinfo_shm : Command fail. Maybe you need add 'vdom'.")
         data_json={}
@@ -457,24 +468,34 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
     ssh_obj = ssh_connect(IP=ip,USER=user,PASS=passw,PORT=port)
     data_json = {}
     flag_error = False
+
+    if vdom!=None and type(vdom)!=list: vdom = [vdom] #Si vdom!None, entonces (es un string) y lo convertimos en list
+
     if ssh_obj=="" or ssh_obj==None :
         print("[ERROR] ssh_execute_by_command | ssh_obj:{0}".format(ssh_obj))
         flag_error = True
     else:
         list_command = command_input.split(",")
         for command in list_command:
+            list_vdom_rpt_json=[]
             if (command=="sys_status"):
                 rpt_json = ssh_get_sys_status(ssh_obj)
             if (command=="sysinfo_conserve"):
                 rpt_json = ssh_get_sysinfo_conserve(ssh_obj)#Si da error accede a la configuración global -> solo acepta global
             if (command=="sysinfo_memory"):
                 rpt_json = ssh_get_sysinfo_memory(ssh_obj)#Si da error accede a la configuración global -> solo acepta global
+            if (command=="sysinfo_shm"):#Si da error accede a la configuración global -> solo acepta global
+                rpt_json = ssh_get_sysinfo_shm(ssh_obj)
             #----------COMANNDOS VDOM--------------------------------------------------------------------------
-            if (command=="sysinfo_shm"):
-                rpt_json = ssh_get_sysinfo_shm(ssh_obj,vdom=vdom)
             if(command=="check_process"):
-                rpt_json = ssh_get_process_runing(ssh_obj,vdom=vdom)
-            #----------DEPRECADE------------------------------------------------------------------------------
+                if vdom!=None :
+                    for one_vdom in vdom:
+                        rpt_json = ssh_get_process_runing(ssh_obj,vdom=one_vdom)
+                        rpt_json.update( {'vdom_name': one_vdom} )
+                        list_vdom_rpt_json.append(rpt_json)
+                else:
+                    rpt_json = ssh_get_process_runing(ssh_obj)
+            #----------INI DEPRECADE------------------------------------------------------------------------------
             if(command=="down_config"):
                 rpt_json = ssh_download_config(ssh_obj,device=typeDevice)
             if(command=="test_logstash_conection"):
@@ -485,16 +506,26 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
                     rpt_json.update( {command : { 'status' : 'success'} })
                 except:
                     rpt_json.update( {command : { 'status' : 'error'} })
-            #----------DEPRECADE------------------------------------------------------------------------------
-            if len(rpt_json)>0:
-                rpt_json.update( {'status' : 'success'} )
+            #----------END DEPRECADE------------------------------------------------------------------------------
+            if len(list_vdom_rpt_json)>0:
+                for rpt_json in list_vdom_rpt_json:
+                    vdom_name = rpt_json['vdom_name']
+                    del rpt_json['vdom_name']
+                    rpt_json,flag_error = validate_result(rpt_json,add_status_field=True,flag_error=flag_error)
+                    #Caso: Existe la key='vdom' en data_json
+                    if 'vdom' in data_json:
+                        #Caso: Existe key='vdom' y dentro existe en nombre de la vdom, pero el commando es otro, se agrega.
+                        if vdom_name in data_json['vdom']:
+                            data_json['vdom'][vdom_name].update( { command : rpt_json } )
+                        #Caso: Existe key='vdom' pero el nombre de la vdom no existe, solo se actualiza.
+                        else:
+                            data_json['vdom'].update( {vdom_name : { command : rpt_json }} )
+                    #Caso: No existe la key='vdom' , se crea todo
+                    else:
+                        data_json.update( {'vdom' : {vdom_name : { command : rpt_json }} } )
             else:
-                rpt_json.update( {'status' : 'error'} )
-                flag_error=True
-            data_json.update( { command : rpt_json } )
-            if(vdom!=None):
-                data_json.update( { 'vdom' : vdom } )
-            
+                data_json,flag_error = validate_result(rpt_json,add_status_field=True,flag_error=flag_error)
+                data_json.update( { command : rpt_json } )
         try: #H23 - mejorar el manejo de errores y parseo para multiprocesos
             ssh_obj.close()
         except:
@@ -511,6 +542,22 @@ def ping_test(IP="0.0.0.0"):
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
+def send_data_by_one_process( data_only_for_one_process_json, name_proccess, data_aditional, logstash={}):
+    data_json_by_command = {}
+    data_json_by_command = { name_proccess :  data_only_for_one_process_json }
+    data_json_by_command.update( data_aditional )
+    #print_json(data_json_by_command)
+    try:
+        flag_send = logstash["send"]
+        if(flag_send):
+            ip_logstah = logstash['ip']
+            port_logstash = logstash['port']
+            send_json(data_json_by_command, IP=ip_logstah, PORT=port_logstash)
+    except:
+        print("[INFO] send_data_by_one_process() | No se envio la data_json al logstash.")
+        pass
+    return
+###############################################################################
 def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={}, vdom=None): #Para el caso de ser ejecutado por "multiprocess", la variable "vdom", debe ser una lista.
     data_json = {}
     start_time = time.time()
@@ -518,6 +565,7 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
     enlapsed_time = time.time() - start_time
     status_general = data_json['status']
     del data_json['status']
+    #Todos los procesos (ejecutados en un solo commando separados por comas) tienen la misma data adicional
     data_aditional = {
         "devip" : ip,
         'rename_index':'health',
@@ -526,18 +574,29 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
         'datetime' : "{0}".format(datetime.datetime.utcnow().isoformat())
     }
     for name_proccess in list(data_json):
-        data_json_by_command = {}
-        data_json_by_command = { name_proccess : data_json[name_proccess]}
-        data_json_by_command.update( data_aditional )
-        #print_json(data_json_by_command)
-        try:
-            flag_send = logstash["send"]
-            if(flag_send):
-                ip_logstah = logstash['ip']
-                port_logstash = logstash['port']
-                send_json(data_json_by_command, IP=ip_logstah, PORT=port_logstash)
-        except:
-            pass
+        if (name_proccess=='vdom'):
+            """
+            'vdom' : {
+                'name_vdom_01' : {
+                    'command01': {...}
+                },
+                'name_vdom_02' : {
+                    'command02': {...}
+                }
+            }
+            """
+            #bucle for para cada processo
+            temp_json = data_json['vdom']
+            for name_vdom in list( temp_json ):
+                data_json_by_one_vdom = temp_json[name_vdom]
+                for vdom_name_proccess in list(data_json_by_one_vdom):
+                    data_add = {}
+                    data_add.update( data_aditional )
+                    data_add.update( {'vdom': name_vdom} )
+                    send_data_by_one_process( data_json_by_one_vdom[vdom_name_proccess] , vdom_name_proccess, data_add, logstash=logstash )
+            #send_data_by_one_process( data_only_for_one_process_json , name_proccess, data_aditional, logstash=logstash)
+        else:
+            send_data_by_one_process( data_json[name_proccess] , name_proccess, data_aditional, logstash=logstash )
     data_json.update(data_aditional)
     data_json.update({'status': status_general})
     return data_json
