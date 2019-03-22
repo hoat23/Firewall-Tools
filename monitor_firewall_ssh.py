@@ -422,7 +422,7 @@ def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
     else:
         data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
         data_json.update({'command' : command})
-    #H2print_json(data_json)
+    #H23print_json(data_json)
     
     return data_json
 ###############################################################################
