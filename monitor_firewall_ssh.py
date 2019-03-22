@@ -539,7 +539,9 @@ def send_data_by_one_process( data_only_for_one_process_json, name_proccess, dat
     data_json_by_command = {}
     data_json_by_command = { name_proccess :  data_only_for_one_process_json }
     data_json_by_command.update( data_aditional )
-    #print_json(data_json_by_command)
+    if name_proccess=='check_process':
+        print("*"*23)
+        print_json(data_json_by_command)
     try:
         flag_send = logstash["send"]
         if(flag_send):
