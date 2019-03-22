@@ -508,23 +508,16 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
                     rpt_json.update( {command : { 'status' : 'error'} })
             #----------END DEPRECADE------------------------------------------------------------------------------
             if len(list_vdom_rpt_json)>0:
+                vdom_json={'vdom':{}}
                 for rpt_json in list_vdom_rpt_json:
                     vdom_name = rpt_json['vdom_name']
                     del rpt_json['vdom_name']
                     rpt_json,flag_error = validate_result(rpt_json,add_status_field=True,flag_error=flag_error)
-                    #Caso: Existe la key='vdom' en data_json
-                    if 'vdom' in data_json:
-                        #Caso: Existe key='vdom' y dentro existe en nombre de la vdom, pero el commando es otro, se agrega.
-                        if vdom_name in data_json['vdom']:
-                            data_json['vdom'][vdom_name].update( { command : rpt_json } )
-                        #Caso: Existe key='vdom' pero el nombre de la vdom no existe, solo se actualiza.
-                        else:
-                            data_json['vdom'].update( {vdom_name : { command : rpt_json }} )
-                    #Caso: No existe la key='vdom' , se crea todo
-                    else:
-                        data_json.update( {'vdom' : {vdom_name : { command : rpt_json }} } )
+                    vdom_json['vdom'].update( { vdom_name: { "check_process":rpt_json } } )
+                data_json.update( vdom_json )
+                list_vdom_rpt_json=[]
             else:
-                data_json,flag_error = validate_result(rpt_json,add_status_field=True,flag_error=flag_error)
+                rpt_json,flag_error = validate_result(rpt_json,add_status_field=True,flag_error=flag_error)
                 data_json.update( { command : rpt_json } )
         try: #H23 - mejorar el manejo de errores y parseo para multiprocesos
             ssh_obj.close()
@@ -589,11 +582,15 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
             temp_json = data_json['vdom']
             for name_vdom in list( temp_json ):
                 data_json_by_one_vdom = temp_json[name_vdom]
-                for vdom_name_proccess in list(data_json_by_one_vdom):
+                vdom_name_proccess='check_process'
+                if vdom_name_proccess in data_json_by_one_vdom: #for vdom_name_proccess in list(data_json_by_one_vdom):
                     data_add = {}
                     data_add.update( data_aditional )
                     data_add.update( {'vdom': name_vdom} )
                     send_data_by_one_process( data_json_by_one_vdom[vdom_name_proccess] , vdom_name_proccess, data_add, logstash=logstash )
+                else:
+                    print("[ERROR] get_data_firewall_ssh() - Key not found : {0}".format(vdom_name_proccess))
+                    print_json(temp_json)
             #send_data_by_one_process( data_only_for_one_process_json , name_proccess, data_aditional, logstash=logstash)
         else:
             send_data_by_one_process( data_json[name_proccess] , name_proccess, data_aditional, logstash=logstash )
