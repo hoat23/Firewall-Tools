@@ -350,6 +350,8 @@ def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retr
             print("{2} [WARN ] : ssh_connect() Trying to connect {0}@{1}".format(USER,IP, datetime.datetime.utcnow().isoformat()))
             cont_intent = cont_intent + 1
             time.sleep(retry_interval)
+    time.sleep(2*60)
+    print("{3} [WARN ] : ssh_connect() Sleeping 2min {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.datetime.utcnow().isoformat()))
     return ""
 ###############################################################################
 def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233, obj_extern = False):
