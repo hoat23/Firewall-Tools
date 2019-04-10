@@ -155,12 +155,14 @@ def process_header(lista):
 
         val = lista[9].replace("F","")
         lista_json.update({'free_memory': int(val)})
-    elif (len(lista)==6):  
+    elif (len(lista)==6 or len(lista)==7):  
         val = lista[4].replace("T","")
         lista_json.update({'total_memory': int(val)})
 
         val = lista[5].replace("F","")
         lista_json.update({'free_memory': int(val)})
+        if len(lista)==7:
+            print("[WARN] Lost value in lista[6] = {0}".format(lista[6]))
     else:
         print("[WARN] lista=["+str(lista)+"]")
     
@@ -369,7 +371,8 @@ def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='passwor
         output_txt = out_.read()
         error_txt = error.read()
     except:
-        output_txt = error_txt = ""
+        print("[ERROR] ssh_exec_comand [{0}]".format(command))
+        output_txt = error_txt = "".encode('utf-8')
     return output_txt,error_txt
 ###############################################################################
 def ssh_download_config(ssh_obj, device="forti"):
@@ -448,7 +451,9 @@ def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm',vdom=None)
         outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
     else:
         outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
-
+        if len(errortxt.decode('utf-8'))==0:
+            outtxt,errortxt = ssh_exec_command('diag sys top 5 25',ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+    
     if errortxt.decode('utf-8').find("Command fail")>=0:
         print("[ERROR] ssh_get_process_runing : Command fail. Maybe you need add 'vdom'.")
         data_json= {}
