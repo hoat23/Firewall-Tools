@@ -4,16 +4,10 @@
 #Programmer: Deiner Zapata Silva
 #e-mail: deinerzapata@gmail.com
 #Date: 13/11/2018
-#Last update: 17/06/2019
 #https://cpiekarski.com/2011/05/09/super-easy-python-json-client-server/
 #http://46.101.4.154/Art�culos%20t�cnicos/Python/Paramiko%20-%20Conexiones%20SSH%$
-########################################################################
-import sys
-import json
-import socket
-import argparse
-import time
-import os
+#
+import sys, json, socket, argparse, time, os
 import paramiko as pmk
 import datetime
 from utils import send_json, list2json, print_json, print_list
@@ -283,7 +277,7 @@ def shm_table_to_json(simple_lista):
         #print("{0:02d} [{1}]".format(cont,line))
     return data_json
 ###############################################################################
-def process_table_to_json_top(simple_lista):
+def process_table_to_json(simple_lista):
     #print(simple_lista)#H23
     simple_lista = simple_lista.replace(" <","<")
     simple_lista = simple_lista.replace(" N","N")
@@ -300,38 +294,6 @@ def process_table_to_json_top(simple_lista):
                 header_json = process_header(lista)
             elif cont>2 :
                 lista_json = list2json(list_header, lista)#,type_data=['str','int','str','float','float'])
-                lista_json.update({"pos":cont_proc})
-                cont_proc = cont_proc + 1
-            
-            if(len(lista_json)>0):
-                list_process.append(lista_json)
-                #print(lista_json)
-        #print("{0:02d} [{1}]".format(cont,line))
-        cont = cont + 1
-    data_json = { 'sys_summary': header_json , 'table_process': list_process}
-    return data_json
-###############################################################################
-def process_table_to_json_top_summary(simple_lista):
-    simple_lista = simple_lista.replace("\n\x1b[H\x1b[J","")
-    simple_lista = simple_lista.replace("*"," ")
-    simple_lista = simple_lista.replace('\r',"")
-    simple_lista = simple_lista[simple_lista.find("PID")-3:]
-    print(simple_lista)#H23
-    list_lines = simple_lista.split('\n')
-    list_header = ["pid","rss","cpu","mem","fds","time","name","cant"]
-    cont = cont_proc = 1
-    list_process = []
-    header_json = {}
-    for line in list_lines:
-        lista_json = {}
-        if(len(line)>0 and cont>1):#passing header
-            line = line.replace("[x","")
-            line = line.replace("]","")
-            level, lista = get_lista(line)
-            if cont==1 :
-                header_json = process_header(lista)
-            elif cont>1 :
-                lista_json = list2json(list_header, lista,flag_def_val=True,default_val="0")#,type_data=['str','int','str','float','float'])
                 lista_json.update({"pos":cont_proc})
                 cont_proc = cont_proc + 1
             
@@ -361,28 +323,8 @@ def sys_status_to_json(simple_lista):
     
     return data_json
 ###############################################################################
-def ssh_connect(IP="0.0.0.0", 
-                USER="user",
-                PASS="pass",
-                PORT=2233,
-                timeout=1000,
-                retry_interval=1, 
-                num_intent=10):
-    """Establece la conexión ssh con el dispositivo
-    Si la conexión es exitosa, debuelve un objeto <ssh>
-    Si la conexión falla devuelve un objeto <null>
-    Parametros:
-    IP             -- Direccion ip del dispositivo a conectarse
-    USER           -- Usuario
-    PASS           -- Password
-    timeout        -- Tiempo maximo a esperar antes de terminar el intento de conexion
-    retry_interval -- Tiempo a esperar antes de reintentar conextarse.
-    num_intent     -- Numero de intentos
-    
-    Links de documentacion:
-    Netmiko : https://pynet.twb-tech.com/blog/automation/netmiko.html
-    Paramiko: https://netdevops.me/2017/waiting-for-ssh-service-to-be-ready-with-paramiko/
-    """
+def ssh_connect(IP="0.0.0.0",USER="user",PASS="pass",PORT=2233,timeout=1000,retry_interval=1, num_intent=10):
+    #https://netdevops.me/2017/waiting-for-ssh-service-to-be-ready-with-paramiko/
     ssh = pmk.SSHClient()
     ssh.set_missing_host_key_policy(pmk.AutoAddPolicy())
     timeout_start = time.time()
@@ -414,84 +356,7 @@ def ssh_connect(IP="0.0.0.0",
     print("{3} [WARN ] : ssh_connect() Sleeping 2min {0}@{1} :{2}".format(USER,IP,sys.exc_info()[0], datetime.datetime.utcnow().isoformat()))
     return ""
 ###############################################################################
-def ssh_exec_command_in_shell(  command,
-                                ssh_obj=None,
-                                delay=2,
-                                delay_shell_invoke = .005,
-                                shell_obj=None,
-                                run_and_close_conection=True):
-    output_txt = error_txt = "".encode('utf-8')
-    try:
-        if ssh_obj==None and shell_obj==None:
-            print("[ERROR] ssh_exec_command_in_shell() | ssh_obj=None")
-            error_txt = "ssh_obj = None and shell_obj = None"
-            return output_txt, error_txt
-        
-        if shell_obj==None:
-            print("[INFO ] ssh_exec_command_in_shell() | Invoking shell")
-            shell_obj = ssh_obj.invoke_shell()
-            time.sleep(delay_shell_invoke)
-
-        # executing command
-        shell_obj.send(command)
-        time.sleep(delay)
-        output_txt = shell_obj.recv(65535)
-        if (run_and_close_conection==True):
-            ssh_obj.close()
-        #output_txt = output_txt.decode('utf-8')
-    except:
-        print("[ERROR] ssh_exec_command_in_shell() | Something was wrong.")
-        error_txt = "Command fail".encode('utf-8')
-    finally:
-        return output_txt, error_txt
-###############################################################################
-def ssh_exec_list_commands( list_commands,
-                        ssh_obj=None,
-                        IP='0.0.0.0',
-                        USER='user',
-                        PASS='password',
-                        PORT=2233, 
-                        obj_extern = False):
-    print("ssh_exec_list_commands ")
-    try:
-        if(ssh_obj==None):
-            ssh_obj = ssh_connect(IP=IP,USER=USER,PASS=PASS,PORT=PORT)
-            obj_extern = True
-        #in_, out_, error = ssh_obj.exec_command(command)
-        shell_obj = ssh_obj.invoke_shell()
-        for command in list_commands:
-            output_txt, error_txt = ssh_exec_command_in_shell(command, shell_obj=shell_obj, run_and_close_conection=False)
-            print("command=[{0}] | len = {1}".format(command, len(output_txt) ) )
-        ssh_obj.close()
-        #print(str(error.read()))
-    except:
-        print("[ERROR] ssh_exec_comand [{0}]".format(command))
-        output_txt = error_txt = "".encode('utf-8')
-    finally:
-        return output_txt,error_txt
-###############################################################################
-def ssh_exec_command(   command,
-                        ssh_obj=None,
-                        IP='0.0.0.0',
-                        USER='user',
-                        PASS='password',
-                        PORT=2233, 
-                        obj_extern = False):
-    """ Ejecuta un comando ssh en el dispositivo
-    a.  Si ssh_obj=None, establece conexion con el dispositivo y ejecuta el comando ssh,
-        cierra la conexion inmediatamente después.
-    b.  Si ssh_obj existe, ejecuta el comando pero no cierra la conexión, manteniendo
-        la sessión activa y lista para recibir otro comando.
-    
-    Parametros:
-    command     -- Comando ssh a ser ejecutado en el dispositivo
-    ssh_obj     -- Objeto ssh que tiene la conexion al dispotivo
-    IP          -- Especificar IP solo si ssh_obj==None
-    USER        -- Especificar USER solo si ssh_obj==None
-    PASS        -- Especificar PASS solo si ssh_obj==None
-    PORT        -- Especificar PORT solo si ssh_obj==None
-    obj_extern  -- Varialbe para gestion interna, de inicio automatico.
-    """
+def ssh_exec_command(command,ssh_obj=None,IP='0.0.0.0',USER='user',PASS='password',PORT=2233, obj_extern = False):
     ssh_stdin = ssh_stdout = ssh_sterr = None
     
     try:
@@ -568,7 +433,7 @@ def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
         outtxt,errortxt = ssh_exec_command("config global\n{0}\n".format(command),ssh_obj=ssh_obj)
     
     if errortxt.decode('utf-8').find("Command fail")>=0:
-        print("[ERROR] ssh_get_sysinfo_memory : Command fail. Maybe you need add 'vdom'.")
+        print("[ERROR] ssh_get_process_runing : Command fail. Maybe you need add 'vdom'.")
         data_json= {}
     else:
         data_json = memory_sysinfo_to_list_json(outtxt.decode('utf-8'))
@@ -578,31 +443,22 @@ def ssh_get_sysinfo_memory(ssh_obj, command='diagnose hardware sysinfo memory'):
     return data_json
 ###############################################################################
 def ssh_get_process_runing(ssh_obj, command='diag sys top 5 25 \x0fm',vdom=None): # UTM_FG , root
-    command_sort_by_mem ='diag sys top-summary \'--sort=mem --interval=100\'\n'
-    command_sort_by_cpu ='diag sys top-summary \'--interval=100\'\n'
-    command = command_sort_by_mem
-    data_json= {}
     if(vdom!=None):
         if vdom=="global":
             command_vdom = "config global\n{0}\n".format(command)
-            list_commands = ["config global\n", "vdom\n"]
         else:
             command_vdom = "config vdom\n edit {0}\n {1}\n".format(vdom,command)
-            list_commands = ["config vdom\n", "edit "+vdom, command]
-        #outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
-        outputtxt, errortxt = ssh_exec_list_commands(list_commands,ssh_obj=ssh_obj)
+        outtxt,errortxt = ssh_exec_command(command_vdom,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
     else:
-        #outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
-        outputtxt, errortxt = ssh_exec_list_commands( [command] ,ssh_obj=ssh_obj)
-        if len(outputtxt.decode('utf-8'))==0: #antes errortxt.decode('utf-8)
-            #outtxt,errortxt = ssh_exec_command('diag sys top 5 25',ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
-            outputtxt, errortxt = ssh_exec_list_commands( ['diag sys top 5 25'] ,ssh_obj=ssh_obj)
+        outtxt,errortxt = ssh_exec_command(command,ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
+        if len(errortxt.decode('utf-8'))==0:
+            outtxt,errortxt = ssh_exec_command('diag sys top 5 25',ssh_obj=ssh_obj)# --sort=name #ERROR: diag sys top-summary
     
     if errortxt.decode('utf-8').find("Command fail")>=0:
         print("[ERROR] ssh_get_process_runing : Command fail. Maybe you need add 'vdom'.")
+        data_json= {}
     else:
-        #data_json = process_table_to_json_top(errortxt.decode('utf-8'))
-        data_json = process_table_to_json_top_summary(outputtxt.decode('utf-8'))
+        data_json = process_table_to_json(errortxt.decode('utf-8'))
         data_json.update({'command' : command})
     return data_json
 ###############################################################################
@@ -682,7 +538,7 @@ def ssh_execute_by_command(command_input, ip , port , user , passw, typeDevice='
 ###############################################################################
 def ping_test(IP="0.0.0.0"):
     rpt_ping="DOWN"
-    rpt = os.system("ping :"+IP)#os.system("ping -c 1"+ip)#Superuser
+    rpt = os.sytem("ping :"+IP)#os.system("ping -c 1"+ip)#Superuser
     if(rpt==0): rpt_ping="UP"
     return rpt_ping
 ###############################################################################
@@ -747,7 +603,6 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
             send_data_by_one_process( data_json[name_proccess] , name_proccess, data_aditional, logstash=logstash )
     data_json.update(data_aditional)
     data_json.update({'status': status_general})
-    #print_json(data_json)
     return data_json
 ###############################################################################
 def get_parametersCMD():
@@ -800,4 +655,4 @@ if __name__=="__main__":
     get_parametersCMD()
     sys.exit(0)
 ###############################################################################
-#get system statusZ
+#get system status
