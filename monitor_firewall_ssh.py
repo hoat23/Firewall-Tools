@@ -747,7 +747,7 @@ def get_data_firewall_ssh(command, ip, port, user, passw, old_time=0, logstash={
             send_data_by_one_process( data_json[name_proccess] , name_proccess, data_aditional, logstash=logstash )
     data_json.update(data_aditional)
     data_json.update({'status': status_general})
-    print_json(data_json)
+    #print_json(data_json)
     return data_json
 ###############################################################################
 def get_parametersCMD():
