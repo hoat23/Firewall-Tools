@@ -299,7 +299,7 @@ def process_table_to_json_top(simple_lista):
             if cont==2 :
                 header_json = process_header(lista)
             elif cont>2 :
-                lista_json = list2json(list_header, lista)#,type_data=['str','int','str','float','float'])
+                lista_json = list2json(list_header, lista, type_data=['str','int','str','float','float']))#,type_data=['str','int','str','float','float'])
                 lista_json.update({"pos":cont_proc})
                 cont_proc = cont_proc + 1
             
@@ -331,7 +331,7 @@ def process_table_to_json_top_summary(simple_lista):
             if cont==1 :
                 header_json = process_header(lista)
             elif cont>1 :
-                lista_json = list2json(list_header, lista,flag_def_val=True,default_val="0")#,type_data=['str','int','str','float','float'])
+                lista_json = list2json(list_header, lista,flag_def_val=True,default_val="0",type_data=['int','str','float','float','float','str','str','int'])#,type_data=['str','int','str','float','float'])
                 lista_json.update({"pos":cont_proc})
                 cont_proc = cont_proc + 1
             
