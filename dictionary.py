@@ -1,6 +1,6 @@
 logstash =  {
     "send" : True,
-    "ip" : "8.8.8.8",
+    "ip" : "0.0.0.0",
     "port" : 5959
 }
 
