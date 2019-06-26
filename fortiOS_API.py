@@ -2,6 +2,7 @@
 # coding: utf-8 
 # Developer: Deiner Zapata Silva.
 # Date: 19/11/2018
+# Last update: 26/06/2019
 # Description: Server to conect to FireWall using API
 # Code Base: https://github.com/sheltont/fortiapi/blob/master/fgt.py
 #########################################################################################
@@ -13,6 +14,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 from subprocess import Popen, PIPE
 from utils import *
+from credentials import *
 ###############################################################################
 class AuthenticationError(Exception):
     def __init__(self, value):
@@ -242,11 +244,6 @@ class FGT(object):
                 return False
 ###############################################################################
 def testmain():
-    urlprefix = 'https://8.8.8.8:9443'
-    username = 'user'
-    password = 'pass'
-    vdom = 'root'
-
     fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
     fgt.login(username, password)
     
@@ -260,7 +257,7 @@ def testmain():
     pprint(res)
 
     #Obtener las interfaces
-    #res = fgt.get('/api/v2/monitor/router/ipv4/select/')
+    #res = fgt.get('/api/v2/monitor/router/ipv4/select/')#https://161.132.109.162:9443/api/v2/monitor/router/ipv4/select/
     #pprint(res)
 
     # Example of CMDB API requests
@@ -329,7 +326,7 @@ def testmain():
     # Always logout after testing is done
     fgt.logout()
 ###############################################################################
-def receive_parameters_from_bash():
+def receive_parameters_from_bash(flagSaveFile=True):
     ip = port = user = passw = None
     
     parser = argparse.ArgumentParser()
@@ -372,9 +369,10 @@ def receive_parameters_from_bash():
             #Download of backup
             if(command=='/api/v2/monitor/system/config/backup?scope=global'):
                 res = fgt.get(command,get_text=True)
-                fecha = datetime.datetime.now().strftime("%Y%m%d")
-                nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
-                #fileTXT_save(res, nameFile = nameFile)
+                if flagSaveFile:
+                    fecha = datetime.datetime.now().strftime("%Y%m%d")
+                    nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
+                    fileTXT_save(res, nameFile = nameFile)
                 #Send backup file to logstash
                 send_json( {'url_api': command ,'backup_file':res, 'host': ip } , IP=ip_logstash, PORT=port_logstash)
             else:

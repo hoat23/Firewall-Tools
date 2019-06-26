@@ -449,6 +449,12 @@ def save_json(data_json, nameFile="data.json"):
             json_file.write("\n")
     return
 #######################################################################################
+def testing_crypto():
+    #pycparser, cffi, six, asynlcrypto, cryptography, pynacl, paramiko
+    #asnlcrypto-0.24.0 bcrypt-3.1.6 cffi-1.12.3 cryptography-2.7 paramiko-2.5.0 pycparser-2.19 pynacl-1.3.0 six-1.12.0
+    #Investigar PGP - Envio de mensajes usando cifrado simetrico y asimetrico
+    return
+#######################################################################################
 # doc_jwt http://ras-software-blog.com/?p=107
 def hmac_json_encode(data_json, password="", algorithm="HS256"):
     #data_json_encrypted = header.payload.signature(openssl sha256 -hmac <password>)
