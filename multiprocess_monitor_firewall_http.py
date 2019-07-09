@@ -3,8 +3,8 @@
 #########################################################################################
 # Developer: Deiner Zapata Silva.
 # Date: 17/01/2019
-# Last update: 26/06/2019
-# Description: Daemon to execute every time to check status of cpu and memory of a firewall
+# Last update: 09/07/2019
+# Description: 
 # sys.setdefaultencoding('utf-8') #reload(sys)
 #########################################################################################
 import os
@@ -32,7 +32,7 @@ def signal_handler(signal, frame):
     
     sys.exit(0)
 #########################################################################################
-def lauch_get_to_firewall(ip,port,username,password,command):
+def lauch_get_to_firewall(ip, port, username, password, command, local_save=True, path="/etc/backup"):
     global dict_ip_fgt
     res = {}
     urlprefix = 'https://' + str(ip) + ":" + str(port)
@@ -44,8 +44,29 @@ def lauch_get_to_firewall(ip,port,username,password,command):
         date = time.strftime("%c")
         if(command.find('/api/v2/monitor/system/config/backup')>=0):
             backup_file = fgt.get(command,get_text=True)
-            res = {"length": len(backup_file),"backup_file": backup_file}
-            if len(backup_file)>0:
+            length_backup = len(backup_file)
+            if local_save:
+                os.system("cd")
+                command = "cd {0}".format(path)
+                os.system(command)
+                fecha = datetime.now().strftime("%Y%m%d")
+                nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
+                res = {
+                    "file": {
+                        "length": length_backup,
+                        "path": "{0}".format( os.getcwd() ) ,
+                        "name":  nameFile
+                        }
+                    }
+                fileTXT_save(backup_file, nameFile = nameFile)
+            else:
+                res = {
+                    "file": {
+                        "length": length_backup,
+                        "bytes": backup_file
+                    }
+                }
+            if length_backup>0:
                 res.update({'status': "success"})
             else:
                 res.update({'status': "error"})
@@ -221,7 +242,7 @@ def init_multiprocessing(list_client, dict_client_ip, server_listen, command, us
 if __name__ == "__main__":
     print("--> [START] multiprocess_monitor_firewall_http.py")
     signal.signal(signal.SIGINT, signal_handler)
-    list_client_to_execute=["alianza"]
+    list_client_to_execute=["yanbal"]
     #list_client_to_execute=["alianza","aje","alexim","babyclubchic","bdo","brexia","crp","ohsjdd","comexa","cosapi","cpal","disal","dispercol","divemotors","egemsa","enapu","famesa","fibertel","filasur","gomelst","happyland","imm","ind_marique","ifreserve","la_llave","lab_hofarm","labocer","mastercol","movilmax","proinversion","san_silvestre","santo_domingo","socios_en_salud","supra","thomas_greg","trofeos_castro","univ_per_union","zinsa","upch","tasa","prompe","engie","cdtel"]
     server_listen = server_elk #logstash #elasticsearch  
     enabled_watchdog=False
