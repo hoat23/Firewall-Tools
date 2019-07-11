@@ -47,18 +47,17 @@ def lauch_get_to_firewall(ip, port, username, password, command, local_save=True
             length_backup = len(backup_file)
             if local_save:
                 os.system("cd")
-                command = "cd {0}".format(path)
-                os.system(command)
+                os.system("cd "+ path)
                 fecha = datetime.now().strftime("%Y%m%d")
                 nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
                 res = {
                     "file": {
                         "length": length_backup,
-                        "path": "{0}".format( os.getcwd() ) ,
+                        "path": "{0}".format( path ) ,
                         "name":  nameFile
                         }
                     }
-                fileTXT_save(backup_file, nameFile = nameFile)
+                fileTXT_save( path +"/"+ backup_file, nameFile = nameFile)
             else:
                 res = {
                     "file": {
@@ -112,7 +111,7 @@ def send_elk(data2send, server_config):
         print_json(rpt)
     return
 #########################################################################################
-def execute_get(ip, port, server_listen, return_dict, command, username, password,num_int=4):
+def execute_get(ip, port, server_listen, return_dict, command, username, password,num_int=2):
     num=0
     #if(isAliveIP(ip,timeout=1500)):
     #    enlapsed_time,status,date = lauch_get_to_firewall(ip,port,username,password,command)
@@ -173,7 +172,7 @@ def execute_get(ip, port, server_listen, return_dict, command, username, passwor
                 }
                 send_elk(data_json, server_listen)
     except:
-        print("-->{0}|ERROR|execute_get() | Don't send data to server.".format( datetime.utcnow().isoformat()) )
+        print("-->{0}|ERROR|execute_get({1}:{2}) | Don't send data to server.".format( datetime.utcnow().isoformat(), ip, port) )
     
     #sleep(28)
     return
@@ -248,5 +247,6 @@ if __name__ == "__main__":
     enabled_watchdog=False
     #command = '/api/v2/monitor/system/vdom-resource/select/'
     command = '/api/v2/monitor/system/config/backup?scope=global'
+    dict_client_ip = dict_client_ip_http
     init_multiprocessing(list_client_to_execute, dict_client_ip, server_listen, command, username, password, enabled_watchdog=enabled_watchdog)
 #########################################################################################
