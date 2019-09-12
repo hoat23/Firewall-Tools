@@ -1,0 +1,650 @@
+-- MODULE-IDENTITY
+--  OrgName
+--     Fortinet Technologies, Inc.
+--  ContactInfo
+--     Technical Support
+--     e-mail: support@fortinet.com
+--     http://www.fortinet.com
+--
+
+FortiWAN-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	fortinet
+		FROM FORTINET-CORE-MIB
+
+	MODULE-COMPLIANCE, OBJECT-GROUP
+		FROM SNMPv2-CONF
+
+	enterprises, TimeTicks, Integer32, Counter32, Counter64, IpAddress,
+	MODULE-IDENTITY, OBJECT-TYPE
+		FROM SNMPv2-SMI
+
+	DisplayString
+		FROM SNMPv2-TC;
+
+fortiwan MODULE-IDENTITY
+    LAST-UPDATED "201511090000Z"
+    ORGANIZATION
+        "Fortinet Technologies, Inc."
+    CONTACT-INFO
+        "Technical Support
+         email: support@fortinet.com
+         http://www.fortinet.com
+        "
+    DESCRIPTION
+        "Registered FortiWANMib OIDs"
+    REVISION    "201511090000Z"
+    DESCRIPTION
+        "Registered FortiWANMib OIDs"
+	::= { enterprises 118 }
+
+fnFortiWANMib OBJECT IDENTIFIER ::= { fortinet 118 }
+
+--
+--  General OID
+--
+
+--
+-- fnFortiWANMib.fwnSystem
+--
+fwnSystem OBJECT IDENTIFIER ::= { fnFortiWANMib 1 }
+
+	fwnSysHAMode OBJECT-TYPE
+		SYNTAX		INTEGER {
+			unsupported(0),
+			supported(1)
+		}
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Boolean values used to indicate if the FortiWAN unit supports HA deployment."
+		::= { fwnSystem 1 }
+
+	fwnSysSlaveVersion	OBJECT-TYPE
+		SYNTAX			DisplayString
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Firmware version of the slave unit deployed with this local unit in HA mode."
+		::= { fwnSystem 2 }
+
+	fwnSysSlaveSerialNumber	OBJECT-TYPE
+		SYNTAX			DisplayString
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Serial number of the slave unit deployed with this local unit in HA mode."
+		::= { fwnSystem 3 }
+
+	fwnSysSlaveUptime	OBJECT-TYPE
+		SYNTAX			TimeTicks
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Uptime of the slave unit deployed with this local unit in HA mode."
+		::= { fwnSystem 4 }
+
+	fwnSysSlaveState	OBJECT-TYPE
+		SYNTAX			DisplayString
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"State of the slave unit deployed with this local unit in HA mode."
+		::= { fwnSystem 5 }
+
+	fwnSysConnections	OBJECT-TYPE
+		SYNTAX			Integer32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number of connections that are being processed in the system."
+		::= { fwnSystem 6 }
+
+	fwnSysCpuLoad	OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Current CPU load (in percentage) of the system."
+		::= { fwnSystem 7 }
+
+	fwnSysUsers	OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number of IP addresses connecting to the FortiWAN unit from the LAN and DMZ subnets."
+		::= { fwnSystem 8 }
+
+	fwnSysPktPerSec	OBJECT-TYPE
+		SYNTAX		Counter32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number of packets transferred via the system every second."
+		::= { fwnSystem 9 }
+
+	fwnSysConnectionRates	OBJECT-TYPE
+		SYNTAX			Counter32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number of connections that are established with the FortiWAN unit every second."
+		::= { fwnSystem 10 }
+--
+-- Network Group OID
+--
+
+--
+-- fnFortiWANMib.fwnNetwork
+--
+fwnNetwork OBJECT IDENTIFIER ::= { fnFortiWANMib 2 }
+
+	fwnWanLink OBJECT IDENTIFIER ::= { fwnNetwork 1 }
+
+		fwnWanNumber OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Maximum of WAN links that the system supports."
+		::= { fwnWanLink 1 }
+
+		fwnWanTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE OF FwnWanEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"This is a table containing one element of object fwnWanEntry used to describe the properties and management information of every WAN link deployed on the system."
+		::= { fwnWanLink 2 }
+
+		fwnWanEntry	OBJECT-TYPE
+		SYNTAX		FwnWanEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"An object used to describe the properties and management information of every WAN link deployed on the system."
+		INDEX		{ fwnWanIndex }
+		::= { fwnWanTable 1 }
+
+		FwnWanEntry ::=
+		SEQUENCE {
+			fwnWanIndex			INTEGER,
+			fwnWanDescr			DisplayString,
+			fwnWanStatus		INTEGER,
+			fwnWanIP			IpAddress,
+			fwnWanInOctets		Counter32,
+			fwnWanOutOctets		Counter32,
+			fwnWanHealthReq		INTEGER,
+			fwnWanHealthRep		INTEGER,
+			fwnWanUpLimit		INTEGER,
+			fwnWanDownLimit		INTEGER,
+			fwnWanTotalOctets	Counter32,
+			fwnWanConnTime		TimeTicks,
+			fwnWanInOctets64	Counter64,
+			fwnWanOutOctets64	Counter64,
+			fwnWanTotalOctets64	Counter64
+		}
+
+		fwnWanIndex	OBJECT-TYPE
+		SYNTAX		Integer32 (1..2147483647)
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"Index of every WAN link."
+		::= { fwnWanEntry 1 }
+
+		fwnWanDescr	OBJECT-TYPE
+		SYNTAX		DisplayString
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Label of every WAN link, such as WAN1, WAN2, WAN3, ect."
+		::= { fwnWanEntry 2 }
+
+		fwnWanStatus OBJECT-TYPE
+		SYNTAX	INTEGER {
+			ok(1),
+			failed(2),
+			disabled(3),
+			backup(4),
+			unkown(5)
+			}
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"State of every WAN link."
+		::= { fwnWanEntry 3 }
+
+		fwnWanIP	OBJECT-TYPE
+		SYNTAX		IpAddress
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"First one of the IP addresses deployed on the WAN port (localhost) of every WAN link."
+		::= { fwnWanEntry 4 }
+
+		fwnWanInOctets	OBJECT-TYPE
+		SYNTAX		Counter32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number (32bit unsigned integer) of octets received on the interface (RX) of every WAN link during system's uptime."
+		::= { fwnWanEntry 5 }
+
+		fwnWanOutOctets	OBJECT-TYPE
+		SYNTAX		Counter32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number (32bit unsigned integer) of octets transmitted from the interface (TX) of every WAN link during system's uptime."
+		::= { fwnWanEntry 6 }
+
+		fwnWanHealthReq	OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number of health detection (ping packets or TCP connect requests) sent out for every WAN link."
+		::= { fwnWanEntry 7 }
+
+		fwnWanHealthRep	OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number of acknowledgements replied to every WAN link for the health detection."
+		::= { fwnWanEntry 8 }
+
+		fwnWanUpLimit		OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Maximum upload speed (in kbps) of every WAN link."
+		::= { fwnWanEntry 9 }
+
+		fwnWanDownLimit	OBJECT-TYPE
+		SYNTAX		Integer32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Maximum download speed (in kbps) of every WAN link."
+		::= { fwnWanEntry 10 }
+
+		fwnWanTotalOctets	OBJECT-TYPE
+		SYNTAX			Counter32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Sum (32bit unsigned integer) of octets received and transmitted on/from the interface (RX and TX) of every WAN link during system's uptime."
+		::= { fwnWanEntry 11 }
+
+		fwnWanConnTime	OBJECT-TYPE
+		SYNTAX		TimeTicks
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"The time period that a WAN link has been available since the last recovery from failure or disability."
+		::= { fwnWanEntry 12 }
+
+		fwnWanInOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number (64bit unsigned integer) of octets received on the interface (RX) of every WAN link during system's uptime."
+		::= { fwnWanEntry 13 }
+
+		fwnWanOutOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number (64bit unsigned integer) of octets transmitted from the (TX) interface of every WAN link during system's uptime."
+		::= { fwnWanEntry 14 }
+
+		fwnWanTotalOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Sum (64bit unsigned integer) of octets received and transmitted on/from the interface (RX and TX) of every WAN link during system's uptime."
+		::= { fwnWanEntry 15 }
+
+		fwnVlanLink OBJECT IDENTIFIER ::= { fwnNetwork 2 }
+
+		fwnVlanNumber	OBJECT-TYPE
+		SYNTAX		Integer32 (0..2147483647)
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number of VLAN defined on the system."
+		::= { fwnVlanLink 1 }
+
+		fwnVlanTable	OBJECT-TYPE
+		SYNTAX		SEQUENCE OF FwnVlanEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"This is a table containing one element of object fwnVlanEntry used to describe the properties and management information of every VLAN defined on the system."
+		::= { fwnVlanLink 2 }
+
+		fwnVlanEntry OBJECT-TYPE
+		SYNTAX		FwnVlanEntry
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"An object used to describe the properties and management information of every VLAN defined on the system."
+		INDEX		{ fwnVlanIndex }
+		::= { fwnVlanTable 1 }
+
+		FwnVlanEntry ::=
+		SEQUENCE {
+			fwnVlanDescr		DisplayString,
+			fwnVlanInOctets			Counter32,
+			fwnVlanOutOctets		Counter32,
+			fwnVlanTotalOctets		Counter32,
+			fwnVlanInOctets64		Counter64,
+			fwnVlanOutOctets64		Counter64,
+			fwnVlanTotalOctets64	Counter64,
+			fwnVlanIndex			INTEGER
+		}
+
+		fwnVlanDescr	OBJECT-TYPE
+		SYNTAX		DisplayString
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Label of every VLAN. It consists of the port that the VLAN is defined on and the VLAN tag, such as port1.101, port1.102, port2.203, ect."
+		::= { fwnVlanEntry 1 }
+
+		fwnVlanInOctets	OBJECT-TYPE
+		SYNTAX		Counter32
+		MAX-ACCESS	read-only
+		STATUS		current
+		DESCRIPTION
+			"Number (32bit unsigned integer) of octets received on the interface (RX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 2 }
+
+		fwnVlanOutOctets	OBJECT-TYPE
+		SYNTAX			Counter32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number (32bit unsigned integer) of octets transmitted from th interface (TX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 3 }
+
+		fwnVlanTotalOctets	OBJECT-TYPE
+		SYNTAX			Counter32
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Sum (32bit unsigned integer) of octets received and transmitted on/from the interface (RX and TX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 4 }
+
+		fwnVlanInOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number (64bit unsigned integer) of octets received on the interface (RX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 5 }
+
+		fwnVlanOutOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Number (64bit unsigned integer) of octets transmitted from the interface (TX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 6 }
+
+		fwnVlanTotalOctets64	OBJECT-TYPE
+		SYNTAX			Counter64
+		MAX-ACCESS		read-only
+		STATUS			current
+		DESCRIPTION
+			"Sum (64bit unsigned integer) of octets received and transmitted on/from the interface (RX and TX) of every VLAN during system's uptime."
+		::= { fwnVlanEntry 7 }
+
+		fwnVlanIndex OBJECT-TYPE
+		SYNTAX		Integer32 (1..2147483647)
+		MAX-ACCESS	not-accessible
+		STATUS		current
+		DESCRIPTION
+			"Index of every VLAN."
+		::= { fwnVlanEntry 8 }
+
+--
+-- Event OID
+--
+
+fwnEvent OBJECT IDENTIFIER ::= { fnFortiWANMib 3 }
+
+	fwnEventSystem OBJECT IDENTIFIER ::= { fwnEvent 1 }
+
+		fwnEventAdministrator OBJECT IDENTIFIER ::= { fwnEventSystem 1 }
+
+			fwnEventAdminAccountPwChanged	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when the password of an account in Administrator group is changed."
+			::= { fwnEventAdministrator 1 }
+
+			fwnEventAdminAccountAdded	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when an account is added into Administrator group."
+			::= { fwnEventAdministrator 2 }
+
+			fwnEventAdminAccountRemoved	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when an account is removed from Administrator group."
+			::= { fwnEventAdministrator 3 }
+
+			fwnEventMonitorAccountPwChanged	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when the password of an account in Monitor group is changed."
+			::= { fwnEventAdministrator 4 }
+
+			fwnEventMonitorAccountAdded	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when an account is added into Monitor group."
+			::= { fwnEventAdministrator 5 }
+
+			fwnEventMonitorAccountRemoved	OBJECT-TYPE
+			SYNTAX		DisplayString
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when an account is removed from Monitor group."
+			::= { fwnEventAdministrator 6 }
+
+		fwnEventConnection OBJECT IDENTIFIER ::= { fwnEventSystem 2 }
+
+			fwnEventConnectionNum	OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Number of connections being processed in system will be sent as an event notification when it exceeds the threshold."
+			::= { fwnEventConnection 1 }
+
+			fwnEventConnectionRate	OBJECT-TYPE
+			SYNTAX		Counter32
+			MAX-ACCESS	accessible-for-notify
+			STATUS	current
+			DESCRIPTION "Number of connections established in system every second will be sent as an event notification when it exceeds the threshold."
+			::= { fwnEventConnection 2 }
+
+		fwnEventHA OBJECT IDENTIFIER ::= { fwnEventSystem 3 }
+
+			fwnEventHASlaveState	OBJECT-TYPE
+			SYNTAX		INTEGER { recovery(1), failure(2) }
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when the slave unit deployed with the local (master) unit in HA mode fails or recovers from a failure."
+			::= { fwnEventHA 1 }
+
+			fwnEventHATakeover	OBJECT-TYPE
+			SYNTAX		INTEGER { true(1), false(2) }
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when the master (local) unit in HA deployment is took over by its slave unit."
+			::= { fwnEventHA 2 }
+
+		fwnEventVRRP OBJECT IDENTIFIER ::= { fwnEventSystem 4 }
+
+			fwnEventVRRPTakeover	OBJECT-TYPE
+			SYNTAX		INTEGER { true(1), false(2) }
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Send event notification when this VRRP master (local) unit is took over by its backup unit."
+			::= { fwnEventVRRP 1 }
+
+
+	fwnEventNetwork OBJECT IDENTIFIER ::= { fwnEvent 2 }
+
+		fwnEventWanlink OBJECT IDENTIFIER ::= { fwnEventNetwork 1 }
+
+			fwnEventWanLinkRecovery	OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Index of a WAN link will be sent as an event notification when the WAN link recovers from a failure."
+			::= { fwnEventWanlink 1 }
+
+			fwnEventWanLinkFailure	OBJECT-TYPE
+			SYNTAX		Integer32
+			MAX-ACCESS	accessible-for-notify
+			STATUS		current
+			DESCRIPTION "Index of a WAN link will be sent as an event notification when the WAN link fails."
+			::= { fwnEventWanlink 2 }
+
+	fwnEventTraffic OBJECT IDENTIFIER ::= { fwnEvent 3 }
+
+		fwnEventTotalWanTraffic	OBJECT-TYPE
+		SYNTAX		Counter32
+		MAX-ACCESS	accessible-for-notify
+		STATUS		current
+		DESCRIPTION "Number of current total WAN traffic (sum of inbound and outbound traffic of every WAN link) will be sent as an event notification when it exceeds the threshold."
+		::= { fwnEventTraffic 1 }
+
+--
+-- fnFortiWANMib.fnHAConformance
+--
+fnHAConformance OBJECT IDENTIFIER ::= { fnFortiWANMib 4 }
+
+fwnSystemHAGroup OBJECT-GROUP
+    OBJECTS     {
+		fwnSysHAMode,
+		fwnSysSlaveVersion,
+		fwnSysSlaveSerialNumber,
+		fwnSysSlaveUptime,
+		fwnSysSlaveState,
+		fwnEventHASlaveState,
+		fwnEventHATakeover
+	}
+    STATUS      current
+    DESCRIPTION
+        "Objects relating the HA of a device."
+    ::= { fnHAConformance 1 }
+
+--
+-- fnFortiWANMib.fnSysConformance
+--
+fnSysConformance OBJECT IDENTIFIER ::= { fnFortiWANMib 5 }
+
+fwnSystemGroup OBJECT-GROUP
+    OBJECTS     {
+		fwnSysConnections,
+		fwnSysCpuLoad,
+		fwnSysUsers,
+		fwnSysPktPerSec,
+		fwnSysConnectionRates,
+		fwnEventAdminAccountPwChanged,
+		fwnEventAdminAccountAdded,
+		fwnEventAdminAccountRemoved,
+		fwnEventMonitorAccountPwChanged,
+		fwnEventMonitorAccountAdded,
+		fwnEventMonitorAccountRemoved,
+		fwnEventConnectionNum,
+		fwnEventConnectionRate,
+		fwnEventVRRPTakeover
+	}
+    STATUS      current
+    DESCRIPTION
+        "Objects relating the system of a device."
+    ::= { fnSysConformance 1 }
+
+--
+-- fnFortiWANMib.fnWANConformance
+--
+fnWANConformance OBJECT IDENTIFIER ::= { fnFortiWANMib 6 }
+
+fwnNetworkWANGroup OBJECT-GROUP
+    OBJECTS     {
+		fwnWanNumber,
+		fwnWanDescr,
+		fwnWanStatus,
+		fwnWanIP,
+		fwnWanInOctets,
+		fwnWanOutOctets,
+		fwnWanHealthReq,
+		fwnWanHealthRep,
+		fwnWanUpLimit,
+		fwnWanDownLimit,
+		fwnWanTotalOctets,
+		fwnWanConnTime,
+		fwnWanInOctets64,
+		fwnWanOutOctets64,
+		fwnWanTotalOctets64,
+		fwnVlanNumber,
+		fwnVlanDescr,
+		fwnVlanInOctets,
+		fwnVlanOutOctets,
+		fwnVlanTotalOctets,
+		fwnVlanInOctets64,
+		fwnVlanOutOctets64,
+		fwnVlanTotalOctets64,
+		fwnEventWanLinkRecovery,
+		fwnEventWanLinkFailure,
+		fwnEventTotalWanTraffic
+	}
+    STATUS      current
+    DESCRIPTION
+        "Objects relating the WAN of a device."
+    ::= { fnWANConformance 1 }
+
+fwnCompliance MODULE-COMPLIANCE
+    STATUS      current
+    DESCRIPTION
+        "The compliance statement for the application MIB."
+
+    MODULE
+        GROUP   fwnSystemHAGroup
+        DESCRIPTION
+              "This group for all FrotiWAN HA state."
+
+        GROUP   fwnSystemGroup
+        DESCRIPTION
+              "This group for all FrotiWAN System state."
+
+        GROUP   fwnNetworkWANGroup
+        DESCRIPTION
+              "This group for all FrotiWAN Network state."
+
+	::= { fnFortiWANMib 7 }
+--
+--End of FortiWAN MIB
+--
+
+END
+
