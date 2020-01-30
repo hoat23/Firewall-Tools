@@ -2,19 +2,24 @@
 # coding: utf-8 
 # Developer: Deiner Zapata Silva.
 # Date: 19/11/2018
-# Last update: 26/06/2019
+# Last update: 30/01/2020
 # Description: Server to conect to FireWall using API
 # Code Base: https://github.com/sheltont/fortiapi/blob/master/fgt.py
 #########################################################################################
 import logging,sys,time,os
 from pprint import pprint
 import requests
-import sys, json, socket, argparse, datetime
+import sys
+import json
+import socket
+import argparse
+import datetime as datetime
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 from subprocess import Popen, PIPE
 from utils import *
 from credentials import *
+from elastic import *
 ###############################################################################
 class AuthenticationError(Exception):
     def __init__(self, value):
@@ -360,7 +365,9 @@ def receive_parameters_from_bash(flagSaveFile=True):
 
     vdom = 'root'
     urlprefix = 'https://' + str(ip) + ":" + str(port)
-
+    data_json = {"@timestamp":"{0}".format(datetime.utcnow().isoformat())}
+    fecha = datetime.now().strftime("%Y%m%d")
+    nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
     if isAliveIP(str(ip)):
         try:
             fgt = FGT(urlprefix,vdom)  #FGT(urlprefix,vdom) #vdom=None
@@ -370,22 +377,21 @@ def receive_parameters_from_bash(flagSaveFile=True):
             if(command=='/api/v2/monitor/system/config/backup?scope=global'):
                 res = fgt.get(command,get_text=True)
                 if flagSaveFile:
-                    fecha = datetime.datetime.now().strftime("%Y%m%d")
-                    nameFile="backupForti_{0}_{1}.conf".format(fecha,ip)
                     fileTXT_save(res, nameFile = nameFile)
-                #Send backup file to logstash
-                send_json( {'url_api': command ,'backup_file':res, 'host': ip } , IP=ip_logstash, PORT=port_logstash)
+                data_json.update({'url_api': command ,'backup_file':res, 'host': ip })
             else:
                 res = fgt.get(command) # /api/v2/monitor/router/ipv4/select/
-                #pprint(res)
-                #Send data to logstash
-                res.update({'url_api': command , "host": ip })
-                send_json( res , IP=ip_logstash, PORT=port_logstash)
+                data_json.update({'url_api': command , "host": ip, "res": res})
+                
         finally:
             fgt.logout()
     else:
             print(" IP:"+str(ip)+" host is DOWN ")
-            #send_json( {"ip": ip, "status": "down"} , IP=ip_logstash, PORT=port_logstash)
+            data_json.update( {"ip": ip, "status": "down"} ) #, IP=ip_logstash, PORT=port_logstash)
+    #Send data to index in elasticsearch
+    elk = elasticsearch()
+    elk.set_data("backup-group01-write","_doc",nameFile, data_json )
+    #send_json( data_json , IP=ip_logstash, PORT=port_logstash)
 ###############################################################################
 if __name__ == '__main__':
     #testmain()
